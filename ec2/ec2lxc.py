@@ -21,7 +21,9 @@ except:
 chef_bootscript="""#!/usr/bin/env bash
 export DEBIAN_FRONTEND=noninteractive 
 apt-get -y update
-apt-get install chef
+apt-get -y install chef
+mkdir -p /var/chef/cookbooks
+chef-solo -ldebug
 """
 
 def sho_run(e):
@@ -78,6 +80,7 @@ if __name__ == "__main__":
         sclient = ssh.SSHClient()
         sclient.set_missing_host_key_policy(ssh.AutoAddPolicy())
         sclient.connect(host, username='ubuntu', key_filename=os.environ['AWS_SSH_PEM'])
+        print "Connected to: %s" % host  
 
         # Get git
         (stdin, stdout, stderr) = sclient.exec_command('sudo apt-get -y update; sudo apt-get -y install git-core')
@@ -88,7 +91,7 @@ if __name__ == "__main__":
         print `sftpclient.listdir('/tmp')`
 
         # Install Chef
-        (stdin, stdout, stderr) = sclient.exec_command('sh /tmp/chefboot.sh')
+        (stdin, stdout, stderr) = sclient.exec_command('sudo sh /tmp/chefboot.sh')
         print stdout.readlines()
 
         sclient.close()
