@@ -84,7 +84,7 @@ def sho_run(e):
     r = e.get_all_instances()
     for s in r:
         for i in s.instances:
-            print i.public_dns_name, i.launch_time, i.state
+            print i.public_dns_name, i.private_ip_address, i.launch_time, i.state
 
 ### The real work
 
