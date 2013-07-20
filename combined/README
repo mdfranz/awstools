@@ -1,0 +1,9 @@
+Usage: awsenum.py [options]
+
+Options:
+  -h, --help      show this help message and exit
+  -i, --ip        Dump L3 addresses
+  -v, --verbose   Verbose output
+  -u, --url       Dump URLs
+  -s, --sql       Dump Database Connection
+  -n, --noresolv  Do not perform DNS resolution
