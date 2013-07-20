@@ -1,6 +1,12 @@
 #!/usr/bin/env python
 
 # Developed against Python Boto v 2.9.8
+# see https://github.com/boto/boto
+# Requires these to be set
+# AWS_ACCESS_KEY_ID
+# AWS_DEFAULT_REGION
+# AWS_SECRET_ACCESS_KEY
+
 
 from socket import gethostbyaddr
 from optparse import OptionParser
