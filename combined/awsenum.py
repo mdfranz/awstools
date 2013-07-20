@@ -40,8 +40,16 @@ class elb_enum():
         return hosts
 
     def get_urls(self):
-        pass
-
+        urls = []
+        for l in self.lbs:
+            for li in l.listeners:
+                if li.instance_protocol == "HTTP":
+                    url = "%s://%s" % ('http',l.dns_name)
+                if li.instance_protocol == "HTTPS":
+                    url = "%s://%s" % ('https',l.dns_name)
+                if url not in urls:
+                    urls.append(url)
+        return urls
 class s3_enum():
     def __init__(self,c):
         self.c = c
@@ -68,8 +76,9 @@ if __name__ == "__main__":
     hosts = []
     urls = []
 
+    elb = elb_enum(ELBConnection())
+
     if options.ip:
-        elb = elb_enum(ELBConnection())
         ec2 = instance_enum(EC2Connection())
 
         all_hosts = [ elb.get_hosts() , ec2.get_hosts() ]
@@ -82,7 +91,7 @@ if __name__ == "__main__":
             print h
     if options.url:
         s3 = s3_enum(S3Connection())
-        all_urls = [ s3.get_urls() ]
+        all_urls = [ s3.get_urls(), elb.get_urls() ]
 
         for src in all_urls:
             for u in src:
