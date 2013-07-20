@@ -57,7 +57,7 @@ class s3_enum():
 
 if __name__ == "__main__":
     parser = OptionParser()
-    parser.add_option("-i","--ip",action="store_true",dest="ip",default=True, help="Dump L3 addresses")
+    parser.add_option("-i","--ip",action="store_true",dest="ip",default=False, help="Dump L3 addresses")
     parser.add_option("-v","--verbose",action="store_true",dest="verbose",default=True, help="Verbose output")
     parser.add_option("-u","--url",action="store_true",dest="url",default=False,help="Dump URLs")
     parser.add_option("-s","--sql",action="store_true",dest="sql",default=False,help="Dump Database Connection")
@@ -81,14 +81,14 @@ if __name__ == "__main__":
         for h in sorted(hosts):
             print h
     if options.url:
-        s3 = s3_enum(S3Connection)
-        all_urls = [ s3_enum.get_hosts() ]
+        s3 = s3_enum(S3Connection())
+        all_urls = [ s3.get_urls() ]
 
         for src in all_urls:
-            for h in src:
+            for u in src:
                 if u not in urls:
                     urls.append(u)
 
-        for h in sorted(urls):
+        for u in sorted(urls):
             print u
 
