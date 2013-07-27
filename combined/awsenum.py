@@ -26,7 +26,7 @@ class instance_enum():
             if a.instance_id:
                 hosts.append(a.public_ip)
         return hosts
-            
+
 class elb_enum():
     def __init__(self,c,resolve_hosts=False):
        self.c=c
