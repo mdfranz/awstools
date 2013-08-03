@@ -7,18 +7,26 @@
 # AWS_DEFAULT_REGION
 # AWS_SECRET_ACCESS_KEY
 
+import boto.ec2
 
 from socket import gethostbyaddr
 from optparse import OptionParser
 from boto.s3.connection import S3Connection
 from boto.ec2.elb import ELBConnection
-from boto.ec2 import EC2Connection
 
 class instance_enum():
-    def __init__(self,c,resolve_hosts=False):
-        self.c=c
+    def __init__(self,resolve_hosts=False):
         self.resolve_hosts = resolve_hosts
-        self.addrs = c.get_all_addresses()
+        self.regions = []
+        self.instance_dict = {} # key is region_name 
+        self.addrs = []
+
+        for r in boto.ec2.regions():
+            self.regions.append(r.connect())
+
+        for r in self.regions:
+            for a in r.get_all_addresses():
+                self.addrs.append(a)
 
     def get_hosts(self):
         hosts = []
@@ -79,13 +87,17 @@ if __name__ == "__main__":
 
     (options,args) = parser.parse_args()
 
+    regions = []
     hosts = []
     urls = []
+
+    for r in boto.ec2.regions():
+        regions.append(r.connect())
 
     elb = elb_enum(ELBConnection())
 
     if options.ip:
-        ec2 = instance_enum(EC2Connection())
+        ec2 = instance_enum()
 
         all_hosts = [ elb.get_hosts() , ec2.get_hosts() ]
 
