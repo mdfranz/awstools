@@ -16,8 +16,6 @@ def block_service(service,max_attempts=5,sleep=3):
             print "Waiting for service to come up"
         time.sleep(sleep)
 
-# Not sure why I had to do this, seems like I shouldn't have to
-
 if __name__ == "__main__":
     logging.basicConfig(filename="boto.log", level=logging.DEBUG)
 
