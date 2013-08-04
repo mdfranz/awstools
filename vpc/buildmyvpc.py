@@ -1,11 +1,12 @@
 #!/usr/bin/env python
 
 VERBOSE=True
-CLEANUP=True
+CLEANUP=False
 
 import ConfigParser,sys,netaddr,time
-import boto.ec2,boto.vpc
+import boto.ec2,boto.vpc,boto.ec2.elb
 import logging
+from boto.ec2.elb import HealthCheck
 
 def block_service(service,max_attempts=5,sleep=3):
     attempt = 0
@@ -27,20 +28,20 @@ if __name__ == "__main__":
     cs = ConfigParser.ConfigParser()
     cs.read(sys.argv[1])
     region = cs.get('vpc','region')
+    elb_name = cs.get('elb','name')
+    sg_name = cs.get('elb','secgroup')
     netblock = netaddr.IPNetwork(cs.get('vpc','netblock'))
     subnet_count = int(cs.get('vpc','subnet_count'))
    
     # Create the VPC
     vpc_conn = boto.vpc.connect_to_region(region)
+    my_routes = vpc_conn.get_all_route_tables()
     my_vpc = vpc_conn.create_vpc(str(netblock))
 
     if VERBOSE:
         print "Existing VPCs"
         for vpc in vpc_conn.get_all_vpcs():
             print vpc.id,vpc.cidr_block
-
-    #block_service(my_vpc)
-
 
     all_subnets = list(netblock.subnet(24))
     my_gateway = vpc_conn.create_internet_gateway()
@@ -57,8 +58,20 @@ if __name__ == "__main__":
 
     vpc_conn.attach_internet_gateway(my_gateway.id,my_vpc.id)
 
+    # Dump routes while we are at it
+
     if VERBOSE:
-        pass
+        for r in my_routes:
+            if r.vpc_id == my_vpc.id:
+                print r.routes
+
+    # On to the ELB
+
+    elb_conn = boto.ec2.elb.connect_to_region(region)
+    elb_sg = vpc_conn.create_security_group(sg_name,my_vpc.id)
+    elb_sg.authorize('tcp',3128,3128,str(netblock))
+
+    my_elb = elb_conn.create_load_balancer(elb_name,None,[(3128, 3128, 'tcp')],[my_subnets[0].id],[elg_sg.id],'internal')
 
     if CLEANUP: 
         for s in my_subnets:
