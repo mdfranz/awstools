@@ -43,18 +43,24 @@ if __name__ == "__main__":
 
     #block_service(my_vpc)
 
-    if VERBOSE:
-        print "Creating VPC in %s in %s" % (region,str(netblock))
 
     all_subnets = list(netblock.subnet(24))
     my_gateway = vpc_conn.create_internet_gateway()
-    vpc_conn.attach_internet_gateway(my_gateway.id,my_vpc.id)
+
+    if VERBOSE:
+        print "Creating VPC in %s in %s" % (region,str(netblock))
+        print "Creating Internet Gateway: %s" % (my_gateway.id)
 
     my_subnets = []
     for s in all_subnets[1:subnet_count+1]:
         if VERBOSE:
             print "Creating subnet %s" % (str(s))
             my_subnets.append(vpc_conn.create_subnet(my_vpc.id,str(s)))
+
+    vpc_conn.attach_internet_gateway(my_gateway.id,my_vpc.id)
+
+    if VERBOSE:
+        pass
 
     if CLEANUP: 
         for s in my_subnets:
