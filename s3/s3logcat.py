@@ -2,7 +2,6 @@
 
 import boto,sys,os
 
-
 if len(sys.argv) == 1:
   prefix = ""
 else:
@@ -17,5 +16,5 @@ if os.environ.has_key("LOGBUCKET"):
 
 else:
   print "set LOGBUCKET to a bucket name"
-  sys.exit(-1)
-  
+  print "Usage:"
+  print "\ts3logcat.py [prefix]"
