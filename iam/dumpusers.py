@@ -2,8 +2,6 @@
 
 import boto.iam,sys,urllib,json
 
-print sys.argv
-
 if len(sys.argv) == 2:
     service = sys.argv[1]
 else:
@@ -32,14 +30,20 @@ for u in  users:
             user_policy_dict = user_policy_response['get_user_policy_response']
             user_policy_result = user_policy_dict['get_user_policy_result']
             policy_doc = user_policy_result['policy_document']
+
             policy_json = json.loads(urllib.unquote(policy_doc))
             policy_statement = policy_json['Statement'][0]
             policy_action = policy_statement['Action']
             policy_resource = policy_statement['Resource']
 
-            for r in policy_resource:
-                if r.find(service) > 0:
-
-                    print "[- %s %s -]"  % (u['user_name'], u['user_id'])
-                    print r
+            if isinstance(policy_resource,list):
+                for r in policy_resource:
+                    if r.find(service) > -1:
+                        print "[- %s %s -]"  % (u['user_name'], u['user_id'])
+                        print r
+            else:
+                for r in policy_resource:
+                    if r.find(service) > -1:
+                        print "[- %s %s -]"  % (u['user_name'], u['user_id'])
+                        print r
             
