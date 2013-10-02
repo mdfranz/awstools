@@ -7,9 +7,9 @@
 
 settings = {}
 settings["debug"] = True
-settings["sanitize"] = True
+settings["sanitize"] = False
 
-import boto,time,sys,os,tempfile
+import boto,time,sys,os,tempfile,boto.ec2
 
 def quotify(s):
     return '"'+s+'"'
@@ -40,10 +40,13 @@ def to_dot(sg_list):
 
 def show_sg(e):
     """Dump out all the instances per reservation"""
+
     for s in e.get_all_security_groups():
-        print "\n --- %s/%s ---" % (s.name,s.id)
+        print "\n --- %s/%s --- (VPC: %s) " % (s.name,s.id,s.vpc_id)
         print "[Instance Members]"
         for i in s.instances():
+
+
             print "\t%s (%s)" % (i.public_dns_name, i.private_ip_address)
         print "[Rules]"
         for r in s.rules:
@@ -52,7 +55,11 @@ def show_sg(e):
 if __name__ == "__main__":
     if settings["debug"]:
         print "Connecting to EC2..."
-    e = boto.connect_ec2()
+
+    if os.environ.has_key("AWS_DEFAULT_REGION"):
+        e = boto.ec2.connect_to_region(os.environ["AWS_DEFAULT_REGION"])
+    else:
+        e = boto.connect_ec2()
 
     if len(sys.argv) == 1:
         show_sg(e)
