@@ -50,7 +50,7 @@ def show_sg(e):
             print "\t%s (%s)" % (i.public_dns_name, i.private_ip_address)
         print "[Rules]"
         for r in s.rules:
-            print "\t SRC: %s DST: %s/%s " % (r.grants,r.ip_protocol,r.to_port)
+            print "\t SRC: %s DST: %s/%s-%s " % (r.grants,r.ip_protocol,r.from_port,r.to_port)
 
 if __name__ == "__main__":
     if settings["debug"]:

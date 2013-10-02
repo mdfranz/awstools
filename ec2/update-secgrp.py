@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 
 DEBUG=True
+DELETE=False
 
 import boto,os,sys,netaddr,boto.ec2
 
@@ -10,9 +11,10 @@ Adds all the netlbocks in the given file to the security group specified
 and validates network blocks using python netaddr.
 
 Examples:
-  $ update-secgrp sg-foo tcp/22 hostlist
-  $ update-secgrp tcp/22-23 hostlist
-  $ update-secgrp list -- dumps all in region
+  $ update-secgrp.py sg-foo tcp/22 hostlist
+  $ update-secgrp.py sg-foo tcp/22 hostlist revoke
+  $ update-secgrp.py tcp/22-23 hostlist
+  $ update-secgrp.py list -- dumps all in region
 
 """
 #AWS_ACCESS_KEY_ID = ''
@@ -68,13 +70,17 @@ if __name__ == "__main__":
       for s in sec_groups:
         print "%s | %s | %s " % (s.id,s.vpc_id,s.name)
       sys.exit(-1)
-    elif len(sys.argv) == 4:
+    elif len(sys.argv) > 3:
       sg_target = sys.argv[1]
       rule = sys.argv[2]
       netfile = sys.argv[3]
     else:
       print usage
       sys.exit(-1)
+
+    if len(sys.argv) == 5:
+      if sys.argv[4] == "revoke":
+        DELETE=True
 
     ### Main logic is right here
     my_group = check_sg(sec_groups,sg_target)
@@ -91,7 +97,10 @@ if __name__ == "__main__":
     # Create rules for 
     for n in valid_nets:
       try:
-        my_group.authorize( ip_protocol=new_rule['protocol'], from_port=new_rule['start_port'], to_port=new_rule['end_port'], cidr_ip=n)
+        if DELETE:
+          my_group.revoke( ip_protocol=new_rule['protocol'], from_port=new_rule['start_port'], to_port=new_rule['end_port'], cidr_ip=n)
+        else:
+          my_group.authorize( ip_protocol=new_rule['protocol'], from_port=new_rule['start_port'], to_port=new_rule['end_port'], cidr_ip=n)
       except Exception as e:
         # Handle duplicates
-        print "Unable to create rule\n\n", e
+        print "Unable to add/delete rule\n\n", e
