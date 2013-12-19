@@ -15,9 +15,10 @@ from boto.s3.connection import S3Connection
 from boto.ec2.elb import ELBConnection
 
 class instance_enum():
-    def __init__(self,tag_hosts=False,resolve_hosts=False):
+    def __init__(self,tag_hosts=False,private_hosts=False,resolve_hosts=False):
         self.resolve_hosts = resolve_hosts
         self.tag_hosts = tag_hosts
+        self.private_hosts = private_hosts
         self.regions = []
         self.instance_dict = {} # key is region_name 
         self.addrs = []
@@ -31,21 +32,44 @@ class instance_enum():
                 for res in r.get_all_instances():
                     for i in res.instances:
                         tag_dict = i.tags
-                        if i.ip_address and tag_dict:
-                          self.name_dict[i.ip_address] = tag_dict['Name']
+
+                        if self.private_hosts:
+                          host_ip = i.private_ip_address
                         else:
-                          self.name_dict[i.ip_address] = 'unknown'
+                          host_ip = i.ip_address
+
+                        if tag_dict:
+                          self.name_dict[host_ip] = tag_dict['Name']
+                        else:
+                          self.name_dict[host_ip] = 'unknown'
             for a in r.get_all_addresses():
                 self.addrs.append(a)
 
     def get_hosts(self):
         hosts = []
+
+        # For EIPs
         for a in self.addrs:
             if a.instance_id:
-                if self.tag_hosts:
-                    hosts.append(a.public_ip+","+self.name_dict[a.public_ip])
+
+                if self.private_hosts:
+                  host_ip = a.private_ip_address
                 else:
-                    hosts.append(a.public_ip)
+                  host_ip = i.ip_address
+
+                if self.tag_hosts:
+                  hosts.append(host_ip+","+self.name_dict[host_ip])
+                else:
+                    hosts.append(host_ip)
+        # The rest of the instances
+
+        for r in self.regions:
+          for res in r.get_all_instances():
+              for i in res.instances:
+                host_ip = i.private_ip_address
+                if self.tag_hosts:
+                  hosts.append(host_ip+","+self.name_dict[host_ip])
+
         return hosts
 
 class elb_enum():
@@ -98,8 +122,7 @@ if __name__ == "__main__":
     parser.add_option("-s","--sql",action="store_true",dest="sql",default=False,help="Dump Database Connection")
     parser.add_option("-n","--noresolv",action="store_true",dest="noresolv",default=True,help="Do not perform DNS resolution")
     parser.add_option("-t","--tag",action="store_true",dest="tag",default=False,help="Return tags for instances")
-
-
+    parser.add_option("-p","--private",action="store_true",dest="private",default=False,help="Return Private IPs (not EIP)")
 
     (options,args) = parser.parse_args()
 
@@ -113,7 +136,7 @@ if __name__ == "__main__":
     elb = elb_enum(ELBConnection())
 
     if options.ip:
-        ec2 = instance_enum(options.tag)
+        ec2 = instance_enum(options.tag,options.private)
 
         all_hosts = [ elb.get_hosts() , ec2.get_hosts() ]
 
