@@ -33,7 +33,7 @@ class instance_enum():
                     for i in res.instances:
                         tag_dict = i.tags
 
-                        if self.private_hosts:
+                        if self.private_hosts and i.vpc_id:
                           host_ip = i.private_ip_address
                         else:
                           host_ip = i.ip_address
@@ -51,12 +51,14 @@ class instance_enum():
         # For EIPs
         for a in self.addrs:
             if a.instance_id:
-
                 if self.private_hosts:
                   host_ip = a.private_ip_address
-                else:
-                  host_ip = i.ip_address
 
+                  # Handle EC2 classic
+                  if not host_ip:
+                    host_ip = a.public_ip
+                else:
+                  host_ip = a.public_ip
                 if self.tag_hosts:
                   hosts.append(host_ip+","+self.name_dict[host_ip])
                 else:
@@ -66,7 +68,13 @@ class instance_enum():
         for r in self.regions:
           for res in r.get_all_instances():
               for i in res.instances:
-                host_ip = i.private_ip_address
+                if i.state != "running":
+                  continue  
+                if i.vpc_id and self.private_hosts:
+                  host_ip = i.private_ip_address
+                else:
+                  host_ip = i.ip_address
+
                 if self.tag_hosts:
                   hosts.append(host_ip+","+self.name_dict[host_ip])
 
