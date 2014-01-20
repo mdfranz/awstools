@@ -120,7 +120,8 @@ class FlowGraph(object):
               hostname = socket.gethostbyaddr(host)[0]
 
               if hostname.find("amazonaws.com") > 0:
-                print "AWS Host, need to lookup later"
+                if self.debug:
+                  print "AWS Host, need to lookup later"
 
               self.nodes[r[0]][r[1]].append(hostname)
               if self.debug:
@@ -140,10 +141,12 @@ class FlowGraph(object):
         if ip.size == 1:
           host = str(ip.ip)
           if host in self.private_ip_dict:
-            print "Found %s (%s)" % (host,self.private_ip_dict[host])
+            if self.debug:
+              print "Found %s (%s)" % (host,self.private_ip_dict[host])
             self.nodes[r[0]][r[1]].append(r[2])
         else:
-          print "Found private network, lets tie to VPC"
+          if self.debug:
+            print "Found private network, lets tie to VPC"
 
         self.nodes[r[0]][r[1]].append(r[2])
 
@@ -152,7 +155,15 @@ class FlowGraph(object):
     for s in self.get_dests():
       for p in self.nodes[s].keys():
         if p not in protocols:
-          protocols.append(p)
+
+          p_split1 = p.split('/')[1]
+          #print `p_split1`
+          (sport,dport) = p_split1.split('-')
+
+          if sport == dport:
+            protocols.append(p.split('/')[0]+'/'+sport)
+          else:
+            protocols.append(p)
     return protocols
       
   def get_dests(self):
@@ -185,8 +196,13 @@ class FlowGraph(object):
 
   def to_grep(self):
     """Dump to stdout for easy grepping"""
-    pass
 
+    for sg in sg_dict.keys():
+      for r in sg_dict[sg].get_rules():
+        print r
+
+
+   
   def to_json(self,fname="Foo"):
     jdump = {}
     jdump['timestamp']  = time.time()
@@ -208,7 +224,7 @@ if __name__ == "__main__":
     asg = AuditGroup(sg)
     sg_dict[asg.sg.id] = asg
 
-  fg = FlowGraph(sg_dict,conn)
+  fg = FlowGraph(sg_dict,conn,False)
 
   print "\nDestinations"
   for d in fg.get_dests():
@@ -225,3 +241,5 @@ if __name__ == "__main__":
   #fg.to_json()
   print `fg.public_ip_dict`
   print `fg.private_ip_dict`
+
+  fg.to_grep()
