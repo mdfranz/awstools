@@ -2,6 +2,75 @@
 
 import boto,boto.vpc,os,socket,netaddr,json,time
 
+class NetDecorator(object):
+  """Adds various metadata to a network source"""
+ 
+  def __init__(self,conn,debug=True):
+    self.private_hosts = {}
+    self.public_hosts = {}
+    self.dns_cache = {}
+    self.vpcs = {}
+    self.debug = debug
+
+    # Build list of Names
+    for res in conn.get_all_instances():
+      for i in res.instances:
+        if 'Name' in i.tags:
+          if self.debug:
+            print "Found",i.tags['Name']
+          if i.private_ip_address:
+            self.private_hosts[i.private_ip_address] = i.tags['Name']
+          if i.public_dns_name:
+            self.public_hosts[i.public_dns_name] = i.tags['Name']
+
+    # Get the VPCs
+    for vpc in conn.get_all_vpcs():
+      self.vpcs[vpc.cidr_block] = vpc
+
+  def resolve(self,i):
+    """Attempt reverse lookup, add aws region or perform whois"""
+    host = i
+
+    if host in self.dns_cache:
+      if self.debug: 
+        print "Found %s in DNS cache" % s
+
+      hostname = self.dns_cache[host]
+      #self.nodes[r[0]][r[1]].append(self.dns_cache[host])
+    else:
+      try:
+        resolved_host = socket.gethostbyaddr(host)[0]
+
+        if resolved_host.find("amazonaws") > 0:
+          hostname = resolved_host.split('.')[1]
+        else:
+          hostname = resolved_host
+          
+      except Exception as e: 
+        if self.debug:
+          print "Error:",e
+        hostname = host
+    return hostname
+
+  def get_name(self,i):
+    """Check for name tag"""
+    pass
+
+  def get_vpc(self,i):
+    """Return the VPC ID"""
+    pass
+
+
+  def decorate_host(self,i):
+    ipaddr = str(i.ip)
+    if not i.is_private():
+      return ipaddr + "|" + self.resolve(ipaddr)
+    else:
+      if ipaddr in self.private_hosts:
+        return ipaddr + "|" + self.private_hosts[ipaddr]
+      else:
+        return ipaddr
+
 class AuditGroup(object):
   """Wrapper for Boto Security Group with Audit Capabilities"""
 
@@ -14,40 +83,40 @@ class AuditGroup(object):
 
     for r in self.sg.rules:
 
-      rule_tuple = (r.ip_protocol,r.from_port,r.to_port)
+      # Right now only handle port based flow, no ICMP
+      if r.ip_protocol not in ['tcp','udp']:
+        continue
+
+      if r.from_port == r.to_port:
+        port_range = r.ip_protocol + "/" + r.from_port
+      else:
+        port_range = r.ip_protocol + "/" + r.from_port + "-" + r.to_port
 
       for g in r.grants:
         if g.cidr_ip:
-          if not rule_tuple in self.cidr_sources:
-            self.cidr_sources[rule_tuple] = []
-          self.cidr_sources[rule_tuple].append(g.cidr_ip)
+          if not port_range in self.cidr_sources:
+            self.cidr_sources[port_range] = []
+          self.cidr_sources[port_range].append(g.cidr_ip)
         elif g.group_id:
-          if not rule_tuple in self.sg_sources:
-            self.sg_sources[rule_tuple] = []
+          if not port_range in self.sg_sources:
+            self.sg_sources[port_range] = []
 
-          self.sg_sources[rule_tuple].append(g.group_id)
+          self.sg_sources[port_range].append(g.group_id)
 
   def get_cidr_rules(self):
     """Return CIDR sources accessing this SG"""
     rules = []
     for r in self.cidr_sources.keys():
-      if r[0] not in ['tcp','udp']:
-        continue
       for s in self.cidr_sources[r]:
-        #print "%s/%s-%s " % ( r[0],r[1],r[2],s)
-        rules.append((self.name,r[0]+"/"+r[1]+"-"+r[2],s))
+        rules.append((r,s))
     return rules
 
   def get_sg_rules(self):
     """Return other security groups that access SG"""
     rules = []
     for r in self.sg_sources.keys():
-      if r[0] not in ['tcp','udp']:
-        continue
-
       for s in self.sg_sources[r]:
-        #print "%s/%s-%s " % ( r[0],r[1],r[2],s)
-        rules.append((self.name,r[0]+"/"+r[1]+"-"+r[2],s))
+        rules.append((r,s))
     return rules
 
   def get_rules(self):
@@ -64,106 +133,59 @@ class AuditGroup(object):
 class FlowGraph(object):
   """Graph database for visualizing security groups"""
 
-  def __init__(self,sg_dict,conn,debug=True):
+  def __init__(self,sg_dict,decorator,debug=True):
     self.nodes = {}
     self.sg_dict = sg_dict
-    self.vpc_dict = {} # vpc_dict[cidr] = vpc 
-    # assume unique cidr
-    self.dns_cache = {}
     self.debug = debug
-    self.public_ip_dict = {}
-    self.private_ip_dict = {}
+    self.decorator = decorator
 
-    # Get VPC's so we can match on subnets for private IPs
-    for vpc in conn.get_all_vpcs():
-      self.vpc_dict[vpc.cidr_block] = vpc
-
-    for res in conn.get_all_instances():
-      for i in res.instances:
-        if 'Name' in i.tags:
-          if self.debug:
-            print "Found",i.tags['Name']
-          if i.private_ip_address:
-            self.private_ip_dict[i.private_ip_address] = i.tags['Name']
-          if i.public_dns_name:
-            self.public_ip_dict[i.public_dns_name] = i.tags['Name']
+    if self.debug:
+      print "Adding rules"
 
     for sg in sg_dict.keys():
       for r in sg_dict[sg].get_rules():
-        self.add_rule_tuple(r)
+
+        if self.debug:
+          print "-" + sg_dict[sg].name,r
+
+        self.add_rule_tuple((sg_dict[sg].name,r[0],r[1]))
 
   def add_rule_tuple(self,r):
-      # Process rules with sg
-
     if self.debug:
-      print "PROCESSING:", r[0],r[1],r[2]
+      print "PROCESSING:", r
 
     if r[0] not in self.nodes:
       self.nodes[r[0]] = {}
 
     if r[1] not in self.nodes[r[0]]:
       self.nodes[r[0]][r[1]] = []
-    
+   
+    # Add entry for security group sources
     if r[2] in self.sg_dict:
+      if self.debug:
+        print "Adding security group"
       self.nodes[r[0]][r[1]].append(self.sg_dict[r[2]].name)
+
+    # Everything else is a network object
     else:
       ip = netaddr.IPNetwork(r[2]) 
 
-      if not ip.is_private():
-        if ip.size == 1:
-          try:
-            host = str(ip.ip)
+      if self.debug:
+        print "Evaluating ",ip
 
-            if host in self.dns_cache:
-              self.nodes[r[0]][r[1]].append(self.dns_cache[host])
-            else:
-              hostname = socket.gethostbyaddr(host)[0]
+      if ip.size == 1:
+        self.nodes[r[0]][r[1]].append(self.decorator.decorate_host(ip))
 
-              if hostname.find("amazonaws.com") > 0:
-                if self.debug:
-                  print "AWS Host, need to lookup later"
-
-              self.nodes[r[0]][r[1]].append(hostname)
-              if self.debug:
-                print "Found",hostname
-              self.dns_cache[host] = hostname
-          except Exception as e:
-            if self.debug:
-              print "Error:",e
-
-            self.dns_cache[host] = host
-            self.nodes[r[0]][r[1]].append(r[2])
-        else:
-          self.nodes[r[0]][r[1]].append(r[2])
+        #self.nodes[r[0]][r[1]].append(hostname)
       else:
-        # Handle private hosts
-
-        if ip.size == 1:
-          host = str(ip.ip)
-          if host in self.private_ip_dict:
-            if self.debug:
-              print "Found %s (%s)" % (host,self.private_ip_dict[host])
-            self.nodes[r[0]][r[1]].append(r[2])
-        else:
-          if self.debug:
-            print "Found private network, lets tie to VPC"
-
-        self.nodes[r[0]][r[1]].append(r[2])
+        pass
 
   def get_protocols(self):
     protocols = []
     for s in self.get_dests():
       for p in self.nodes[s].keys():
         if p not in protocols:
-
-          p_split1 = p.split('/')[1]
-          #print `p_split1`
-          (sport,dport) = p_split1.split('-')
-
-          if sport == dport:
-            protocols.append(p.split('/')[0]+'/'+sport)
-          else:
-            protocols.append(p)
+          protocols.append(p)
     return protocols
       
   def get_dests(self):
@@ -196,10 +218,10 @@ class FlowGraph(object):
 
   def to_grep(self):
     """Dump to stdout for easy grepping"""
-
-    for sg in sg_dict.keys():
-      for r in sg_dict[sg].get_rules():
-        print r
+    for resource in self.nodes.keys():
+      for port in self.nodes[resource].keys():
+        for source in self.nodes[resource][port]:
+          print "%s,%s,%s " % (resource,port,source)
 
 
    
@@ -224,22 +246,6 @@ if __name__ == "__main__":
     asg = AuditGroup(sg)
     sg_dict[asg.sg.id] = asg
 
-  fg = FlowGraph(sg_dict,conn,False)
-
-  print "\nDestinations"
-  for d in fg.get_dests():
-    print d
-
-  print "\nProtocols"
-  for p in fg.get_protocols():
-    print p
-
-  print "\nSources"
-  for s in fg.get_sources():
-    print s
-
-  #fg.to_json()
-  print `fg.public_ip_dict`
-  print `fg.private_ip_dict`
-
+  d = NetDecorator(conn,False)
+  fg = FlowGraph(sg_dict,d,False)
   fg.to_grep()
