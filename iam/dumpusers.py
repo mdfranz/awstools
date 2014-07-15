@@ -23,7 +23,6 @@ for u in  users:
 
     if len(policies['policy_names']) > 0:
         for policy_name in policies['policy_names']:
-
             #print "Checking", policy_name
 
             user_policy_response = iam_conn.get_user_policy(u['user_name'],policy_name)
@@ -33,17 +32,18 @@ for u in  users:
 
             policy_json = json.loads(urllib.unquote(policy_doc))
             policy_statement = policy_json['Statement'][0]
-            policy_action = policy_statement['Action']
-            policy_resource = policy_statement['Resource']
 
-            if isinstance(policy_resource,list):
-                for r in policy_resource:
-                    if r.find(service) > -1:
-                        print "[- %s %s -]"  % (u['user_name'], u['user_id'])
-                        print r
-            else:
-                for r in policy_resource:
-                    if r.find(service) > -1:
-                        print "[- %s %s -]"  % (u['user_name'], u['user_id'])
-                        print r
-            
+            if policy_statement.has_key('Action'):
+              policy_action = policy_statement['Action']
+              policy_resource = policy_statement['Resource']
+
+              if isinstance(policy_resource,list):
+                  for r in policy_resource:
+                      if r.find(service) > -1:
+                          print "[- %s %s -]"  % (u['user_name'], u['user_id'])
+                          print r
+              else:
+                  for r in policy_resource:
+                      if r.find(service) > -1:
+                          print "[- %s %s -]"  % (u['user_name'], u['user_id'])
+                          print r
