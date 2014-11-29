@@ -2,6 +2,11 @@
 
 
 """
+Create these files:
+
+https://github.com/edasque/cloudwatch2graphite/blob/master/conf/metrics.json.sample
+
+
 {
     "metrics": [
             {
