@@ -83,8 +83,8 @@ for m in c.list_metrics():
             metric["MetricName"] = m.name
             metric["Dimensions.member.1.Name"] = d
             metric["Dimensions.member.1.Value"] = m.dimensions[d][0]
-            metric["Unit"] = metric_config[m.namespace]["metrics"][m.name][0]
-            metric["Statistics.member.1"] = metric_config[m.namespace]["metrics"][m.name][1]
+            metric["Unit"] = metric_config[m.namespace]["metrics"][m.name][1]
+            metric["Statistics.member.1"] = metric_config[m.namespace]["metrics"][m.name][0]
   if metric != {}:
     cwatch_config["metrics"].append(metric)
 
