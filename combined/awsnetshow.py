@@ -11,26 +11,25 @@ conn = boto.ec2.EC2Connection()
 regions = conn.get_all_regions()
 account_id =  conn.get_all_security_groups(groupnames='default')[0].owner_id
 
+vpc_list = []
+
 for r in regions:
   c = boto.ec2.connect_to_region(r.name)
   v = boto.vpc.connect_to_region(r.name)
   e = boto.ec2.elb.connect_to_region(r.name)
 
   if len(sys.argv) == 1:
-    print "Usage:\n\tawsnetshow.py [hosts|vpcs|elbs|all]"
+    print "Usage:\n\tawsnetshow.py [hosts|vpcs|elbs|all|vpcid]"
     sys.exit(-1)
 
   if "hosts" in sys.argv or "all" in sys.argv:
     i_dict = {}
     hosts = []  # will probably be duplicates here but uniq them out
 
-
     for res in c.get_all_instances():
       for i in res.instances:  
         # Skip private addresses
         if i.ip_address:
-
-
           if i.tags.has_key("Name"):
             identifier = i.tags["Name"]
             i_dict[i.id] = identifier
@@ -51,8 +50,30 @@ for r in regions:
 
   if "vpcs" in sys.argv or "all" in sys.argv:
     for i in v.get_all_vpcs():
-        print "%s,%s,%s,%s" % (account_id,r.name, i.cidr_block,i.id)
+
+
+        if i.tags.has_key("Name"):
+          identifier = i.tags["Name"]
+        else:
+          identifier = "Undefined"
+
+        print "%s,%s,%s,%s,%s" % (account_id,r.name, i.cidr_block,i.id,identifier)
 
   if "elbs" in sys.argv or "all" in sys.argv:
     for lb in e.get_all_load_balancers():
         print "%s,%s,%s,None" % (account_id,r.name, lb.dns_name)
+
+  if sys.argv[1] not in  ['all','hosts','elbs']:
+    vpc_list = []
+    for i in v.get_all_vpcs():
+      vpc_list.append(i.id)
+
+    if sys.argv[1] in vpc_list:
+      print "Found",sys.argv[1]
+      for res in c.get_all_instances():
+        for i in res.instances:  
+          if i.vpc_id == sys.argv[1]:
+            if i.tags.has_key("Name"):
+              identifier = i.tags["Name"]
+              print i.private_ip_address, identifier
+
