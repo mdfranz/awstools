@@ -34,6 +34,9 @@ if __name__ == "__main__":
     v = boto.vpc.connect_to_region(r.name)
     e = boto.ec2.elb.connect_to_region(r.name)
 
+    if not c:
+      continue      
+
     if len(sys.argv) == 1:
       print "Usage:\n\tawsnetshow.py [hosts|vpcs|elbs|all|vpcid|privatehosts]"
       sys.exit(-1)
