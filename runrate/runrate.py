@@ -4,8 +4,9 @@ import boto.vpc,sys,boto,boto.ec2,socket,boto.rds
 
 pricing = {}
 
-def bar_tuple(t):
+def bar_tuple(t,accountid):
     """Print pretty line for csv import into .xls"""
+    t.insert(0,str(accountid))
     for c in t:
         print " | " + str(c),
     print " |"
@@ -14,7 +15,7 @@ def sum_volumes(vlist):
     for v in vlist:
         size =+ v.size
     return size
-
+    
 def get_systems(c,tag_string=None,running_only=True):
     """Get instance data including ec2 and ebs"""
     hosts = []
@@ -37,11 +38,11 @@ def get_systems(c,tag_string=None,running_only=True):
             else:
                 identifier = "Undefined"
 
-            hosts.append( ( "ec2", r.name, identifier, i.instance_type, sum_volumes(volumes[i.id])  ) )
+            hosts.append( [ "ec2", r.name, identifier, i.instance_type, sum_volumes(volumes[i.id])  ] )
 
     return hosts
 
-def get_dbs(c): 
+def get_dbs(c):
     hosts = []
     for i in c.get_all_dbinstances():
         if i.status == "available":
@@ -50,7 +51,7 @@ def get_dbs(c):
             else:
                 redundancy = "single_az"
 
-        hosts.append( ( "rds", i.availability_zone[:-1], i.endpoint[0], i.instance_class, i.allocated_storage, i.engine, redundancy ))
+        hosts.append( [ "rds", i.availability_zone[:-1], i.endpoint[0], i.instance_class, i.allocated_storage, i.engine, redundancy ] )
     return hosts
 
 if __name__ == "__main__":
@@ -68,9 +69,9 @@ if __name__ == "__main__":
                     continue
             c = boto.ec2.connect_to_region(r.name)
             for h in get_systems(c):
-                bar_tuple(h)
+                bar_tuple(h,account_id)
 
             c = boto.rds.connect_to_region(r.name)
             for h in get_dbs(c):
-                bar_tuple(h)
+                bar_tuple(h,account_id)
 
