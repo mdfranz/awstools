@@ -72,6 +72,9 @@ if __name__ == "__main__":
                 bar_tuple(h,account_id)
 
             c = boto.rds.connect_to_region(r.name)
-            for h in get_dbs(c):
-                bar_tuple(h,account_id)
+            if c: 
+                db_instances = get_dbs(c)
+                if db_instances:
+                    for h in db_instances:
+                        bar_tuple(h,account_id)
 
