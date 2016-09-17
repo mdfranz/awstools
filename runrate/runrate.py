@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-import boto.vpc,sys,boto,boto.ec2,socket,boto.rds
+import boto.vpc,sys,boto,boto.ec2,socket,boto.rds,datetime
 
 pricing = {}
 
