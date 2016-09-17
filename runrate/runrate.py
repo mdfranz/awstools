@@ -11,6 +11,11 @@ def bar_tuple(t,accountid):
         print " | " + str(c),
     print " |"
 
+def running_days(ltime):
+    lt_datetime = datetime.datetime.strptime( ltime.split('.')[0], '%Y-%m-%dT%H:%M:%S')
+    lt_delta = datetime.datetime.utcnow() - lt_datetime
+    return str(lt_delta.days)
+
 def sum_volumes(vlist):
     for v in vlist:
         size =+ v.size
@@ -38,7 +43,7 @@ def get_systems(c,tag_string=None,running_only=True):
             else:
                 identifier = "Undefined"
 
-            hosts.append( [ "ec2", r.name, identifier, i.instance_type, sum_volumes(volumes[i.id])  ] )
+            hosts.append( [ "ec2", r.name, identifier, i.instance_type, sum_volumes(volumes[i.id])],running_days(i.launch_time) )
 
     return hosts
 
