@@ -43,7 +43,7 @@ def get_systems(c,tag_string=None,running_only=True):
             else:
                 identifier = "Undefined"
 
-            hosts.append( [ "ec2", r.name, identifier, i.instance_type, sum_volumes(volumes[i.id])],running_days(i.launch_time) )
+            hosts.append( [ "ec2", r.name, identifier, i.instance_type, sum_volumes(volumes[i.id]), running_days(i.launch_time) ] )
 
     return hosts
 
@@ -56,7 +56,7 @@ def get_dbs(c):
             else:
                 redundancy = "single_az"
 
-        hosts.append( [ "rds", i.availability_zone[:-1], i.endpoint[0], i.instance_class, i.allocated_storage, i.engine, redundancy ] )
+            hosts.append( [ "rds", i.availability_zone[:-1], i.endpoint[0], i.instance_class, i.allocated_storage, i.engine, redundancy ] )
     return hosts
 
 if __name__ == "__main__":
