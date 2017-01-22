@@ -1,15 +1,24 @@
 #!/usr/bin/env python
 
-import boto.vpc,sys,boto,boto.ec2,socket,boto.rds,datetime
+import boto.vpc,sys,boto,boto.ec2,socket,boto.rds,datetime,json,time
 
-pricing = {}
+
+class PriceDict(dict):
+    def __missing__(self, key):
+        value = self[key] = type(self)() # retain local pointer to value
+        return value
+
+pricing = PriceDict()
+pricefile="/tmp/pricefile.json"
+outputdir="/tmp/"
 
 def bar_tuple(t,accountid):
     """Print pretty line for csv import into .xls"""
     t.insert(0,str(accountid))
+    s=""
     for c in t:
-        print " | " + str(c),
-    print " |"
+        s = s + " | " + str(c)
+    return(s+" |\n")
 
 def running_days(ltime):
     lt_datetime = datetime.datetime.strptime( ltime.split('.')[0], '%Y-%m-%dT%H:%M:%S')
@@ -20,7 +29,13 @@ def sum_volumes(vlist):
     for v in vlist:
         size =+ v.size
     return size
-    
+
+def guess_os(i):
+    if i.key_name:
+        return "Linux"
+    else:
+        return "Windows"
+
 def get_systems(c,tag_string=None,running_only=True):
     """Get instance data including ec2 and ebs"""
     hosts = []
@@ -43,7 +58,8 @@ def get_systems(c,tag_string=None,running_only=True):
             else:
                 identifier = "Undefined"
 
-            hosts.append( [ "ec2", r.name, identifier, i.instance_type, sum_volumes(volumes[i.id]), running_days(i.launch_time) ] )
+            pricing["ec2"][r.name][i.instance_type][guess_os(i)] = 0
+            hosts.append( [ "ec2", r.name, identifier, i.instance_type, sum_volumes(volumes[i.id]), running_days(i.launch_time),guess_os(i)] )
 
     return hosts
 
@@ -56,6 +72,7 @@ def get_dbs(c):
             else:
                 redundancy = "single_az"
 
+            pricing["rds"][i.availability_zone[:-1]][i.instance_class][i.engine+"-"+redundancy] = 0
             hosts.append( [ "rds", i.availability_zone[:-1], i.endpoint[0], i.instance_class, i.allocated_storage, i.engine, redundancy ] )
     return hosts
 
@@ -68,18 +85,24 @@ if __name__ == "__main__":
         print "Usage:\n\trunrate.py <region>"
         sys.exit(-1)
     else:
+        outfile = open(pricefile,"w")
+        rds_out = open(outputdir+account_id+"-rds-"+time.strftime("%Y-%m-%d.bsv"),"w")
+        ec2_out = open(outputdir+account_id+"-ec2-"+time.strftime("%Y-%m-%d.bsv"),"w")
+
         for r in regions:
             if sys.argv[1] != "all":
                 if sys.argv[1] != r.name:
                     continue
             c = boto.ec2.connect_to_region(r.name)
             for h in get_systems(c):
-                bar_tuple(h,account_id)
+                ec2_out.write( bar_tuple(h,account_id))
 
             c = boto.rds.connect_to_region(r.name)
             if c: 
                 db_instances = get_dbs(c)
                 if db_instances:
                     for h in db_instances:
-                        bar_tuple(h,account_id)
+                        rds_out.write( bar_tuple(h,account_id))
 
+        # Create pricing template that can be populated later
+        json.dump(pricing,outfile,indent=2)
