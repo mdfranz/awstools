@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-import boto.vpc,sys,boto,boto.ec2,socket,boto.rds,datetime,json,time
+import boto.vpc,sys,boto,boto.ec2,socket,boto.rds,datetime,json,time,os
 
 
 class PriceDict(dict):
@@ -11,6 +11,7 @@ class PriceDict(dict):
 pricing = PriceDict()
 pricefile="/tmp/pricefile.json"
 outputdir="/tmp/"
+price_json = None
 
 def bar_tuple(t,accountid):
     """Print pretty line for csv import into .xls"""
@@ -34,7 +35,10 @@ def guess_os(i):
     if i.key_name:
         return "Linux"
     else:
-        return "Windows"
+        if i.platform:
+            return "Windows"
+        else:
+            return "Linux"
 
 def get_systems(c,tag_string=None,running_only=True):
     """Get instance data including ec2 and ebs"""
@@ -50,16 +54,21 @@ def get_systems(c,tag_string=None,running_only=True):
 
     for res in c.get_all_instances():
        for i in res.instances:  
-            if running_only:
-                if i.state != "running":
-                    continue
+          if running_only:
+            if i.state != "running":
+                continue
             if i.tags.has_key("Name"):
                 identifier = i.tags["Name"]
             else:
                 identifier = "Undefined"
 
-            pricing["ec2"][r.name][i.instance_type][guess_os(i)] = 0
-            hosts.append( [ "ec2", r.name, identifier, i.instance_type, sum_volumes(volumes[i.id]), running_days(i.launch_time),guess_os(i)] )
+            if not price_json:
+                pricing["ec2"][r.name][i.instance_type][guess_os(i)] = 0
+                daily_cost = 0
+            else:
+                daily_cost = price_json["ec2"][r.name][i.instance_type][guess_os(i)] * 24
+
+            hosts.append( [ "ec2", r.name, identifier, i.instance_type, (daily_cost * 365)/12, sum_volumes(volumes[i.id]), running_days(i.launch_time),guess_os(i) ] )
 
     return hosts
 
@@ -72,8 +81,14 @@ def get_dbs(c):
             else:
                 redundancy = "single_az"
 
-            pricing["rds"][i.availability_zone[:-1]][i.instance_class][i.engine+"-"+redundancy] = 0
-            hosts.append( [ "rds", i.availability_zone[:-1], i.endpoint[0], i.instance_class, i.allocated_storage, i.engine, redundancy ] )
+            if not price_json:
+                pricing["rds"][i.availability_zone[:-1]][i.instance_class][i.engine+"-"+redundancy] = 0
+                daily_cost = 0
+            else:
+                daily_cost = price_json["rds"][i.availability_zone[:-1]][i.instance_class][i.engine+"-"+redundancy] * 24
+
+
+            hosts.append( [ "rds", i.availability_zone[:-1], i.endpoint[0], i.instance_class, (daily_cost*365)/12, i.allocated_storage, i.engine, redundancy ] )
     return hosts
 
 if __name__ == "__main__":
@@ -85,7 +100,19 @@ if __name__ == "__main__":
         print "Usage:\n\trunrate.py <region>"
         sys.exit(-1)
     else:
-        outfile = open(pricefile,"w")
+
+        # Check for existing json file that continues prices per service/region/instance type
+        if os.path.exists(pricefile):
+            print "Found price template file"
+            with open(pricefile) as f:
+                price_json = json.load(f)
+            print "Found values for:", price_json.keys()
+        else:
+            # Otherwise generate a template that we can go in an populate manually from AWS pricing
+            print "Generating new pricing templat"
+            outfile = open(pricefile,"w")
+
+        # Create "bar separated value" for each service and account
         rds_out = open(outputdir+account_id+"-rds-"+time.strftime("%Y-%m-%d.bsv"),"w")
         ec2_out = open(outputdir+account_id+"-ec2-"+time.strftime("%Y-%m-%d.bsv"),"w")
 

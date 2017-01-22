@@ -1,0 +1,263 @@
+{
+  "ec2": {
+    "us-east-1": {
+      "m1.medium": {
+        "Linux": 0.087
+      }, 
+      "m3.medium": {
+        "Linux": 0.067
+      }, 
+      "m1.small": {
+        "Linux": 0.044
+      }, 
+      "m1.xlarge": {
+        "Linux": 0.35
+      }, 
+      "t1.micro": {
+        "Linux": 0.02
+      }, 
+      "c3.large": {
+        "Linux": 0.105
+      }
+    }, 
+    "ap-southeast-1": {
+      "m1.medium": {
+        "Linux": 0.117
+      }, 
+      "m3.medium": {
+        "Linux": 0.098
+      }, 
+      "t2.micro": {
+        "Linux": 0.015
+      }, 
+      "m1.large": {
+        "Linux": 0.23
+      }, 
+      "m1.small": {
+        "Linux": 0.058
+      }, 
+      "c1.medium": {
+        "Linux": 0.164
+      }, 
+      "m4.large": {
+        "Linux": 0.266
+      }, 
+      "t2.medium": {
+        "Linux": 0.06
+      }, 
+      "t2.small": {
+        "Linux": 0.03
+      }, 
+      "c3.large": {
+        "Linux": 0.132
+      }
+    },
+    "us-west-2": {
+      "m3.large": {
+        "Windows": 0.259,
+        "Linux": 0.133
+      }, 
+      "m3.medium": {
+        "Windows": 0.13,
+        "Linux": 0.067
+      }, 
+      "t2.large": {
+        "Windows": 0.122
+      }, 
+      "t2.micro": {
+        "Windows": 0.017,
+        "Linux": 0.012
+      }, 
+      "c4.large": {
+        "Linux": 0.1
+      }, 
+      "m4.xlarge": {
+        "Linux": 0.35
+      }, 
+      "c4.xlarge": {
+        "Windows": 0.383
+      }, 
+      "m4.large": {
+        "Windows": 0.203,
+        "Linux": 0.215
+      },
+      "t2.medium": {
+        "Windows": 0.065, 
+        "Linux": 0.047
+      },
+      "t2.small": {
+        "Linux": 0.023
+      },
+      "c3.large": {
+        "Windows": 0.188
+      }
+    },
+    "us-west-1": {
+      "m1.medium": {
+        "Linux": 0.095
+      }, 
+      "m1.small": {
+        "Linux": 0.047
+      }, 
+      "c3.large": {
+        "Linux": 0.12 
+      }, 
+      "m3.medium": {
+        "Linux": 0.077
+      }
+    }, 
+    "eu-central-1": {
+      "m3.medium": {
+        "Linux": 0.079 
+      }, 
+      "t2.micro": {
+        "Linux": 0.014 
+      }, 
+      "r3.xlarge": {
+        "Linux": 0.4
+      }, 
+      "t2.large": {
+        "Linux": 0.108
+      }, 
+      "m4.large": {
+        "Linux": 0.129
+      }, 
+      "t2.medium": {
+        "Linux": 0.054
+      }, 
+      "t2.small": {
+        "Linux": 0.027
+      }
+    }, 
+    "eu-west-1": {
+      "m1.medium": {
+        "Linux": 0.095
+      }, 
+      "m3.medium": {
+        "Linux": 0.073
+      }, 
+      "m1.small": {
+        "Linux": 0.047
+      }, 
+      "c1.medium": {
+        "Linux": 0.148
+      }, 
+      "c3.large": {
+        "Linux": 0.12
+      }, 
+      "m3.xlarge": {
+        "Linux": 0.293 
+      }
+    }
+  },
+  "rds": {
+    "us-east-1": {
+      "db.m1.xlarge": {
+        "mysql-single_az": 0.465
+      }, 
+      "db.m1.large": {
+        "mysql-single_az": 0.230, 
+        "mysql-multi_az": 0.460
+      }
+    }, 
+    "ap-southeast-1": {
+      "db.m1.medium": {
+        "mysql-multi_az": 0.290
+      }, 
+      "db.m3.large": {
+        "mysql-single_az":0.240, 
+        "mysql-multi_az": 0.480 
+      }, 
+      "db.m1.large": {
+        "mysql-single_az": 0.290
+      }, 
+      "db.m3.xlarge": {
+        "mysql-single_az": 0.485, 
+        "mysql-multi_az": 0.970
+      }
+    }, 
+    "us-west-2": {
+      "db.m4.2xlarge": {
+        "sqlserver-se-multi_az": 5.095
+      }, 
+      "db.t2.medium": {
+        "mysql-single_az": 0.068, 
+        "mysql-multi_az": 0.136
+      }, 
+      "db.m3.large": {
+        "mysql-multi_az": 0.370
+      }, 
+      "db.m3.medium": {
+        "sqlserver-se-single_az": 0.655, 
+        "mysql-multi_az": 0.180,
+        "sqlserver-se-multi_az": 1.310
+      }, 
+      "db.m3.xlarge": {
+        "sqlserver-se-single_az": 1.345,
+        "mysql-multi_az": 0.740,
+        "sqlserver-se-multi_az": 2.690
+      }, 
+      "db.m3.2xlarge": {
+        "sqlserver-se-multi_az": 5.370
+      }, 
+      "db.m4.large": {
+        "mysql-multi_az": 0.350
+      }, 
+      "db.t2.large": {
+        "mysql-multi_az": 0.272
+      } 
+	},
+    "us-west-1": {
+      "db.m1.medium": {
+        "mysql-multi_az": 0.120
+      }, 
+      "db.m1.large": {
+        "mysql-single_az": 0.245, 
+        "mysql-multi_az": 0.490
+      }, 
+      "db.m1.small": {
+        "mysql-single_az": 0.060
+      }, 
+      "db.m3.medium": {
+        "mysql-single_az": 0.095
+      }
+    }, 
+    "eu-central-1": {
+      "db.t2.medium": {
+        "mysql-multi_az": 0.160
+      }, 
+      "db.m3.xlarge": {
+        "mysql-multi_az": 0.865
+      }, 
+      "db.m3.large": {
+        "mysql-multi_az": 0.435
+      }, 
+      "db.m3.medium": {
+        "mysql-multi_az": 0.210
+      }
+    }, 
+    "eu-west-1": {
+      "db.m1.medium": {
+        "mysql-single_az": 0.120,
+        "mysql-multi_az": 0.240
+      }, 
+      "db.m1.large": {
+        "mysql-single_az": 0.245
+      }, 
+      "db.m3.large": {
+        "mysql-single_az": 0.200, 
+        "mysql-multi_az": 0.400
+      }, 
+      "db.m3.xlarge": {
+        "mysql-single_az": 0.400, 
+        "mysql-multi_az": 0.800
+      }, 
+      "db.m3.2xlarge": {
+        "mysql-multi_az": 1.570
+      }, 
+      "db.m1.small": {
+        "mysql-single_az": 0.06
+      }
+    }
+  }
+}
