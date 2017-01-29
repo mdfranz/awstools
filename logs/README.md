@@ -4,6 +4,7 @@ This is a quick hack to search back through your haproxy logs stored in CloudWat
 
 Assumes you have AWS credentials defined somewhere in a standard boto way and boto3 is installed.
 
+Tested on Boto3 1.3.1
 
 # Usage
 ```
