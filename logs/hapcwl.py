@@ -6,6 +6,7 @@ import boto3,sys,string,time
 filter_string = "-js -themes -Stopping -started -OK -unavailable -backend -DOWN -aboutMe -NOSRV -login.html -SSL -Stopped"
 limit=10000  # how many events to return
 time_filter=250 # only return events with Tr:(Total time spent waiting for the server to send a full HTTP response. In milliseconds.
+log_group = '/var/log/haproxy.log'  # default log group
 
 def clean_url(u):
     """Remove parameters to clean things up"""
@@ -27,12 +28,9 @@ if __name__ == "__main__":
 
         if len(sys.argv) > 4:
             log_group = sys.argv[4]
-        else:
-            log_group = '/var/log/haproxy.log'
 
         l = boto3.client("logs",region_name = region)
         streams = []
-
 
         # Find out all the log streams in the group
         for s in l.describe_log_streams(logGroupName=log_group)['logStreams']:
@@ -42,13 +40,12 @@ if __name__ == "__main__":
 
         for e in l.filter_log_events(logStreamNames=streams,startTime=int(start_search*1000),logGroupName=log_group,filterPattern=filter_string,limit=limit)['events']:
             fields = e['message'].split()
-
             try:
                 haproxy_stats = fields[9].split('/')
                 http_time = int(haproxy_stats[3])
                 if http_time > time_filter:
                     print http_time, e['logStreamName'], string.join(fields[0:3],' '),fields[8],clean_url(fields[18])
-                #print `fields`
             except:
+                # Dump the event and stop if you can't parse properly
                 print fields
                 sys.exit(-1)
