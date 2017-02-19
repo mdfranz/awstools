@@ -178,7 +178,9 @@
     }, 
     "us-west-2": {
       "db.m4.2xlarge": {
-        "sqlserver-se-multi_az": 5.095
+        "sqlserver-se-multi_az": 5.095,
+        "sqlserver-se-single_az": 5.095,
+        "mysql-multi_az": 2.548
       }, 
       "db.t2.medium": {
         "mysql-single_az": 0.068, 

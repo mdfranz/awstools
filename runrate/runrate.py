@@ -92,7 +92,7 @@ def get_dbs(c):
                     daily_cost = price_json["rds"][i.availability_zone[:-1]][i.instance_class][i.engine+"-"+redundancy] * 24
 
                 except Exception as e:
-                    print "No rate for ",i.endpoint[0],i.instance_class
+                    print "No rate for ",i.endpoint[0],i.instance_class,redundancy, i.engine
                     daily_cost = 0
 
             hosts.append( [ "rds", i.availability_zone[:-1], i.endpoint[0], i.instance_class, (daily_cost*365)/12, i.allocated_storage, i.engine, redundancy ] )
