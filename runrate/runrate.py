@@ -2,7 +2,6 @@
 
 import boto.vpc,sys,boto,boto.ec2,socket,boto.rds,datetime,json,time,os
 
-
 class PriceDict(dict):
     def __missing__(self, key):
         value = self[key] = type(self)() # retain local pointer to value
@@ -66,7 +65,11 @@ def get_systems(c,tag_string=None,running_only=True):
                 pricing["ec2"][r.name][i.instance_type][guess_os(i)] = 0
                 daily_cost = 0
             else:
-                daily_cost = price_json["ec2"][r.name][i.instance_type][guess_os(i)] * 24
+                try:
+                    daily_cost = price_json["ec2"][r.name][i.instance_type][guess_os(i)] * 24
+                except Exception as e:
+                    print "No rate for", e,identifier
+                    daily_cost = 0
 
             hosts.append( [ "ec2", r.name, identifier, i.instance_type, (daily_cost * 365)/12, sum_volumes(volumes[i.id]), running_days(i.launch_time),guess_os(i) ] )
 
@@ -85,8 +88,12 @@ def get_dbs(c):
                 pricing["rds"][i.availability_zone[:-1]][i.instance_class][i.engine+"-"+redundancy] = 0
                 daily_cost = 0
             else:
-                daily_cost = price_json["rds"][i.availability_zone[:-1]][i.instance_class][i.engine+"-"+redundancy] * 24
+                try:
+                    daily_cost = price_json["rds"][i.availability_zone[:-1]][i.instance_class][i.engine+"-"+redundancy] * 24
 
+                except Exception as e:
+                    print "No rate for ",i.endpoint[0],i.instance_class
+                    daily_cost = 0
 
             hosts.append( [ "rds", i.availability_zone[:-1], i.endpoint[0], i.instance_class, (daily_cost*365)/12, i.allocated_storage, i.engine, redundancy ] )
     return hosts
@@ -107,6 +114,7 @@ if __name__ == "__main__":
             with open(pricefile) as f:
                 price_json = json.load(f)
             print "Found values for:", price_json.keys()
+            outfile = None
         else:
             # Otherwise generate a template that we can go in an populate manually from AWS pricing
             print "Generating new pricing templat"
@@ -116,13 +124,18 @@ if __name__ == "__main__":
         rds_out = open(outputdir+account_id+"-rds-"+time.strftime("%Y-%m-%d.bsv"),"w")
         ec2_out = open(outputdir+account_id+"-ec2-"+time.strftime("%Y-%m-%d.bsv"),"w")
 
+        rds_count = 0
+        ec2_count = 0
+
         for r in regions:
+            
             if sys.argv[1] != "all":
                 if sys.argv[1] != r.name:
                     continue
             c = boto.ec2.connect_to_region(r.name)
             for h in get_systems(c):
                 ec2_out.write( bar_tuple(h,account_id))
+                ec2_count += 1
 
             c = boto.rds.connect_to_region(r.name)
             if c: 
@@ -130,6 +143,11 @@ if __name__ == "__main__":
                 if db_instances:
                     for h in db_instances:
                         rds_out.write( bar_tuple(h,account_id))
+                        rds_count += 1
 
         # Create pricing template that can be populated later
-        json.dump(pricing,outfile,indent=2)
+        print "EC2 Found: ",ec2_count
+        print "RDS Found: ",rds_count
+       
+        if outfile:
+            json.dump(pricing,outfile,indent=2)
