@@ -1,5 +1,9 @@
 import boto3
 
+
+# This was super helpful
+# https://github.com/bevkololi/python-boto3-and-aws-s3-basics/blob/master/resource.py 
+
 c = boto3.client("s3")
 r = boto3.resource("s3")
 
