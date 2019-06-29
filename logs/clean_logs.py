@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 
 stream_delete = 180 # delete log streams if last ingest time greater than 180 
+dry_run = False
 
 import boto3,sys,string,time,socket
 
@@ -19,17 +20,19 @@ if __name__ == "__main__":
 
             if int(g['storedBytes']) == 0 or stream_count == 0:
                 print "EMPTY LOG GROUP, DELETING:",log_group
-                c.delete_log_group(logGroupName=log_group)
+                if not dry_run:
+                    c.delete_log_group(logGroupName=log_group)
                 continue 
 
             for s in c.describe_log_streams(logGroupName=log_group)['logStreams']:
                 log_stream = s['logStreamName']
-                age_sec = int(time.time()) -  ( s['lastIngestionTime'] / 1000 ) 
+                if s.has_key('lastIngestionTime'):
+                    age_sec = int(time.time()) -  ( s['lastIngestionTime'] / 1000 ) 
 
-                print "FOUND STREAM", log_stream, s['lastIngestionTime']
+                    print "FOUND STREAM", log_stream, s['lastIngestionTime']
 
-                if ( age_sec / ( 3600 * 24 ) )  > 180: 
-                    print s 
-                    print "STALE LOG STREAM, DELETING:",log_stream
-                    r = c.delete_log_stream(logGroupName=log_group,logStreamName=log_stream)
-                    print r
+                    if ( age_sec / ( 3600 * 24 ) )  > 180: 
+                        print s 
+                        print "STALE LOG STREAM, DELETING:",log_stream
+                        if not dry_run:
+                            c.delete_log_stream(logGroupName=log_group,logStreamName=log_stream)
