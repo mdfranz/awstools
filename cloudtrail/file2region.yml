@@ -1,0 +1,21 @@
+input:
+  label: "input"
+  file:
+
+    paths: [./cloudtrail-logs/CloudTrail/**/*.gz]
+    codec: gzip/all-bytes
+
+pipeline:
+  processors:
+    - bloblang: root = this.Records
+    - unarchive:
+        format: json_array
+
+output:
+  label: "output" 
+  file:
+    path: ./tmp/cloudtrail-${! json("awsRegion") }.json
+    codec: lines
+
+
+

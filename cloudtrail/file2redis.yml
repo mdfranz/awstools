@@ -1,0 +1,19 @@
+input:
+  label: "input"
+  file:
+
+    paths: [./cloudtrail-logs/CloudTrail/**/*.gz]
+    codec: gzip/all-bytes
+
+pipeline:
+  processors:
+    - bloblang: root = this.Records
+    - unarchive:
+        format: json_array
+
+output:
+  label: "output" 
+  redis_list:
+    url: tcp://127.0.0.1:6379
+    key: cloudtrail
+    max_in_flight: 512
