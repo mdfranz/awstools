@@ -11,8 +11,10 @@ if __name__ == "__main__":
     my_region = "us-east-1"
 
   c = boto3.client("inspector",region_name=my_region)
-  p = c.get_paginator("list_findings")
 
+
+
+  p = c.get_paginator("list_findings")
   print ("\n== Getting findings ==")
   for f in p.paginate():
     for arn in f['findingArns']:
@@ -26,3 +28,12 @@ if __name__ == "__main__":
   for r in p.paginate():
     for arn in r['assessmentRunArns']:
       print (arn)
+
+
+  p = c.get_paginator("list_assessment_targets")
+  print ("\n== Getting targets ==")
+  for t in p.paginate():
+    for arn in t['assessmentTargetArns']:
+      print(arn)
+
+
