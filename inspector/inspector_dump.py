@@ -2,9 +2,7 @@
 
 # See https://github.com/grepcoffee/aws-scripts/blob/master/inspector/ListFindingsBySev/listfindings.py
 
-
 import boto3,sys
-
 
 if __name__ == "__main__":
   if len(sys.argv) > 1:
@@ -15,9 +13,16 @@ if __name__ == "__main__":
   c = boto3.client("inspector",region_name=my_region)
   p = c.get_paginator("list_findings")
 
+  print ("\n== Getting findings ==")
   for f in p.paginate():
     for arn in f['findingArns']:
-      print (arn)
       print()
+      print (arn)
       for r in c.describe_findings(findingArns=[arn], locale='EN_US')['findings']:
         print(r['title'],r['severity'])
+
+  print ("\n== Getting asessment runs ==")
+  p = c.get_paginator("list_assessment_runs")
+  for r in p.paginate():
+    for arn in r['assessmentRunArns']:
+      print (arn)
