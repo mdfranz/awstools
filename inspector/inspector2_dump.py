@@ -16,4 +16,5 @@ if __name__ == "__main__":
   print ("\n== Getting findings ==")
   for f in p.paginate():
     for fi in (f['findings']):
+      print("\n====",fi['findingArn'])
       print (fi['description'])
