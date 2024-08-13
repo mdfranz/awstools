@@ -19,8 +19,10 @@ eksctl get addon \
   --cluster $EKS_CLUSTER_NAME
 echo 
 
+eksctl get iamserviceaccount --region $EKS_REGION --cluster $EKS_CLUSTER_NAME 
+
+
 kubectl get sa ebs-csi-controller-sa -n kube-system -o yaml 
-# eksctl get iamserviceaccount --region $EKS_REGION --cluster $EKS_CLUSTER_NAME -
 
 echo "=== Nodes and Pods"
 

@@ -28,8 +28,9 @@ INSTANCE_TYPE="$3"
 
 ACCOUNT_ID=$(aws sts get-caller-identity  --query "Account" --output text)
 KUBECONFIG=$HOME/.kube/$ACCOUNT_ID-$EKS_REGION-$EKS_CLUSTER_NAME.yaml
-CSI_ROLE_NAME="eksctl-${EKS_CLUSTER_NAME}_EBS_CSI_DriverRole"
-ACCOUNT_ROLE_ARN="arn:aws:iam::$ACCOUNT_ID:role/$CSI_ROLE_NAME"
+
+# CSI_ROLE_NAME="eksctl-${EKS_CLUSTER_NAME}_EBS_CSI_DriverRole"
+# ACCOUNT_ROLE_ARN="arn:aws:iam::$ACCOUNT_ID:role/$CSI_ROLE_NAME"
 
 view_cluster() {
   echo "=== Checking EBS CSI Addon"
@@ -58,39 +59,90 @@ fi
 
 echo "Creating cluster $EKS_CLUSTER_NAME in $ACCOUNT_ID in $EKS_REGION"
 
-eksctl create cluster \
-  --region $EKS_REGION  --name $EKS_CLUSTER_NAME \
-  --version $EKS_VERSION \
-  --node-type $INSTANCE_TYPE  --nodes-min=2 --nodes-max=5 --dumpLogs
+# eksctl create cluster \
+#  --region $EKS_REGION  --name $EKS_CLUSTER_NAME \
+#  --version $EKS_VERSION \
+#  --node-type $INSTANCE_TYPE  --nodes-min=2 --nodes-max=5 --dumpLogs
  
+tempfile=$(mktemp)
+
+echo "=== Generating YAML eksctl configuration"
+echo "YAML configuration for Cluster will be in $tempfile"
+
+cat << EOF > $tempfile
+---
+apiVersion: eksctl.io/v1alpha5
+kind: ClusterConfig
+
+metadata:
+  name: ${EKS_CLUSTER_NAME}
+  region: ${EKS_REGION}
+  version: "${EKS_VERSION}"
+
+iam:
+  withOIDC: true
+  serviceAccounts:
+  - metadata:
+      name: aws-load-balancer-controller
+      namespace: kube-system
+    wellKnownPolicies:
+      awsLoadBalancerController: true
+  - metadata:
+      name: ebs-csi-controller-sa
+      namespace: kube-system
+    wellKnownPolicies:
+      ebsCSIController: true
+  - metadata:
+      name: external-dns
+      namespace: kube-system
+    wellKnownPolicies:
+      externalDNS: true
+  - metadata:
+      name: cert-manager
+      namespace: cert-manager
+    wellKnownPolicies:
+      certManager: true
+nodeGroups:
+  - name: ng-1
+    instanceType: ${INSTANCE_TYPE}
+    desiredCapacity: 2
+    minSize: 2
+    maxSize: 5
+    volumeSize: 100
+    volumeType: gp3
+    volumeEncrypted: true
+EOF
+
+eksctl create cluster -f $tempfile
+
 #
 # TODO - should check for existing Association 
 #
+# eksctl utils associate-iam-oidc-provider \
+#  --cluster $EKS_CLUSTER_NAME \
+#  --region $EKS_REGION \
+#  --approve --dumpLogs
+#echo "=== Creating Service Account for EBS CSI Driver"
+#POLICY_ARN="arn:aws:iam::aws:policy/service-role/AmazonEBSCSIDriverPolicy"
+#eksctl create iamserviceaccount \
+#  --name "ebs-csi-controller-sa" \
+#  --namespace "kube-system" \
+#  --cluster $EKS_CLUSTER_NAME \
+#  --region $EKS_REGION \
+#  --attach-policy-arn $POLICY_ARN \
+#  --role-only \
+#  --role-name $CSI_ROLE_NAME \
+#  --approve --dumpLogs
+# eksctl create iamserviceaccount --cluster=<clusterName> --name=<serviceAccountName> --namespace=<serviceAccountNamespace> --attach-policy-arn=<policyARN>
 
-eksctl utils associate-iam-oidc-provider \
-  --cluster $EKS_CLUSTER_NAME \
-  --region $EKS_REGION \
-  --approve --dumpLogs
-
-echo "=== Creating Service Account for EBS CSI Driver"
-
-POLICY_ARN="arn:aws:iam::aws:policy/service-role/AmazonEBSCSIDriverPolicy"
-eksctl create iamserviceaccount \
-  --name "ebs-csi-controller-sa" \
-  --namespace "kube-system" \
-  --cluster $EKS_CLUSTER_NAME \
-  --region $EKS_REGION \
-  --attach-policy-arn $POLICY_ARN \
-  --role-only \
-  --role-name $CSI_ROLE_NAME \
-  --approve --dumpLogs
+CSI_ACCOUNT_ROLE_ARN=$(eksctl get addon --cluster  $EKS_CLUSTER_NAME --region $EKS_REGION -1 -o json | jq -r '.[]|select(.Name=="aws-ebs-csi-driver")|.IAMRole')
 
 echo "=== Creating EBS CSI Driver Addon"
 eksctl create addon \
   --name "aws-ebs-csi-driver" \
   --cluster $EKS_CLUSTER_NAME \
   --region=$EKS_REGION \
-  --service-account-role-arn $ACCOUNT_ROLE_ARN \
+  --service-account-role-arn $CSI_ACCOUNT_ROLE_ARN \
   --force --dumpLogs
 
 read -p "Do you want to add a metrics server? (y/N) " addMetrics
@@ -103,17 +155,14 @@ else
     echo "Skipping Metrics Server deployment"
 fi
 
-eksctl create iamserviceaccount \
-      --namespace "kube-system" \
-      --cluster $EKS_CLUSTER_NAME \
-      --region $EKS_REGION \
-      --name "aws-load-balancer-controller" \
-      --attach-policy-arn=arn:aws:iam::$ACCOUNT_ID:policy/LoadBalancerControllerPolicy \
-      --override-existing-serviceaccounts \
-      --approve --dumpLogs
-
-
-### 
+#eksctl create iamserviceaccount \
+#      --namespace "kube-system" \
+#      --cluster $EKS_CLUSTER_NAME \
+#      --region $EKS_REGION \
+#      --name "aws-load-balancer-controller" \
+#      --attach-policy-arn=arn:aws:iam::$ACCOUNT_ID:policy/LoadBalancerControllerPolicy \
+#      --override-existing-serviceaccounts \
+#      --approve --dumpLogs
 
 exit 
 
