@@ -1,7 +1,15 @@
 #!/bin/bash
 
 #
-# based on https://medium.com/@joachim8675309/eks-ebs-storage-with-eksctl-3e526f534215
+# Originally based on https://medium.com/@joachim8675309/eks-ebs-storage-with-eksctl-3e526f534215
+#
+
+METRICS_CRD="https://github.com/kubernetes-sigs/metrics-server/releases/latest/download/components.yaml"
+CERTMGR_CRD="https://github.com/jetstack/cert-manager/releases/download/v1.12.3/cert-manager.yaml"
+LBC_CRD="https://github.com/kubernetes-sigs/aws-load-balancer-controller/releases/download/v2.8.2/v2_8_2_full.yaml"
+
+#
+#
 #
 
 if [ "$#" -ne 3 ]; then
@@ -9,30 +17,52 @@ if [ "$#" -ne 3 ]; then
     exit 1
 fi
 
+#
+#
+#
+
 EKS_REGION="$1"
 EKS_CLUSTER_NAME="$2"
 EKS_VERSION="1.29"
 INSTANCE_TYPE="$3"
 
-ACCOUNT_ID=$(aws sts get-caller-identity \
-  --query "Account" \
-  --output text
-)
-
+ACCOUNT_ID=$(aws sts get-caller-identity  --query "Account" --output text)
 KUBECONFIG=$HOME/.kube/$ACCOUNT_ID-$EKS_REGION-$EKS_CLUSTER_NAME.yaml
+CSI_ROLE_NAME="eksctl-${EKS_CLUSTER_NAME}_EBS_CSI_DriverRole"
+ACCOUNT_ROLE_ARN="arn:aws:iam::$ACCOUNT_ID:role/$CSI_ROLE_NAME"
 
-echo "KUBECONFIG: $KUBECONFIG"
+view_cluster() {
+  echo "=== Checking EBS CSI Addon"
+  eksctl get addon \
+    --name "aws-ebs-csi-driver" \
+    --region $EKS_REGION \
+    --cluster $EKS_CLUSTER_NAME
+
+  echo "=== Checking Service Account"
+  kubectl get sa ebs-csi-controller-sa -n kube-system -o yaml 
+  eksctl get iamserviceaccount --region $EKS_REGION --cluster $EKS_CLUSTER_NAME -
+
+  kubectl get nodes
+  kubectl get pods -A -o wide 
+  kubectl get deployment ebs-csi-controller -n kube-system
+
+  echo "=== Displaying addons"
+  eksctl get addons --region $EKS_REGION --cluster $EKS_CLUSTER_NAME
+}
+
+read -p "Enable strict mode? (y/N) " exiterror
+if [[ $exiterror =~ ^[Yy]$ ]]
+then
+  set -euo pipefail
+fi 
+
+echo "Creating cluster $EKS_CLUSTER_NAME in $ACCOUNT_ID in $EKS_REGION"
 
 eksctl create cluster \
-  --region $EKS_REGION \
-  --name $EKS_CLUSTER_NAME \
+  --region $EKS_REGION  --name $EKS_CLUSTER_NAME \
   --version $EKS_VERSION \
-  --node-type $INSTANCE_TYPE \
-  --nodes-min=2 --nodes-max=5
+  --node-type $INSTANCE_TYPE  --nodes-min=2 --nodes-max=5 --dumpLogs
  
-ROLE_NAME="eksctl-${EKS_CLUSTER_NAME}_EBS_CSI_DriverRole"
-ACCOUNT_ROLE_ARN="arn:aws:iam::$ACCOUNT_ID:role/$ROLE_NAME"
-
 #
 # TODO - should check for existing Association 
 #
@@ -40,10 +70,11 @@ ACCOUNT_ROLE_ARN="arn:aws:iam::$ACCOUNT_ID:role/$ROLE_NAME"
 eksctl utils associate-iam-oidc-provider \
   --cluster $EKS_CLUSTER_NAME \
   --region $EKS_REGION \
-  --approve
+  --approve --dumpLogs
+
+echo "=== Creating Service Account for EBS CSI Driver"
 
 POLICY_ARN="arn:aws:iam::aws:policy/service-role/AmazonEBSCSIDriverPolicy"
-
 eksctl create iamserviceaccount \
   --name "ebs-csi-controller-sa" \
   --namespace "kube-system" \
@@ -51,39 +82,57 @@ eksctl create iamserviceaccount \
   --region $EKS_REGION \
   --attach-policy-arn $POLICY_ARN \
   --role-only \
-  --role-name $ROLE_NAME \
-  --approve
+  --role-name $CSI_ROLE_NAME \
+  --approve --dumpLogs
 
+echo "=== Creating EBS CSI Driver Addon"
 eksctl create addon \
   --name "aws-ebs-csi-driver" \
   --cluster $EKS_CLUSTER_NAME \
   --region=$EKS_REGION \
   --service-account-role-arn $ACCOUNT_ROLE_ARN \
-  --force
+  --force --dumpLogs
 
-echo "Deploying Metrics Server"
+read -p "Do you want to add a metrics server? (y/N) " addMetrics
+if [[ $addMetrics =~ ^[Yy]$ ]]
+then
+    echo "Deploying Latest Metrics Server"
+    kubectl apply -f $METRICS_CRD
+    sleep 3
+else
+    echo "Skipping Metrics Server deployment"
+fi
 
-kubectl apply -f https://github.com/kubernetes-sigs/metrics-server/releases/latest/download/components.yaml
+eksctl create iamserviceaccount \
+      --namespace "kube-system" \
+      --cluster $EKS_CLUSTER_NAME \
+      --region $EKS_REGION \
+      --name "aws-load-balancer-controller" \
+      --attach-policy-arn=arn:aws:iam::$ACCOUNT_ID:policy/LoadBalancerControllerPolicy \
+      --override-existing-serviceaccounts \
+      --approve --dumpLogs
 
-echo "Checking EBS CSI Addon"
 
-eksctl get addon \
-  --name "aws-ebs-csi-driver" \
-  --region $EKS_REGION \
-  --cluster $EKS_CLUSTER_NAME
+### 
 
-echo "Checking Service Account"
+exit 
 
-kubectl get sa ebs-csi-controller-sa -n kube-system -o yaml 
-eksctl get iamserviceaccount --region $EKS_REGION --cluster $EKS_CLUSTER_NAME -
+helm repo add eks https://aws.github.io/eks-charts
+helm install aws-load-balancer-controller eks/aws-load-balancer-controller \
+     -n kube-system --set clusterName=$EKS_CLUSTER_NAME \
+     --set serviceAccount.create=false --set serviceAccount.name=aws-load-balancer-controller
 
+kubectl apply --validate=false -f $CERTMGR_CRD
+
+echo "=== Restarting Controllers"
 echo "Restarting EBS CSI Controller"
 kubectl rollout restart deployment ebs-csi-controller -n kube-system
 
-sleep 3 
+# echo "Restarting AWS LB Controller"
+# kubectl rollout restart deployment aws-load-balancer-controller -n kube-system
 
-kubectl get nodes
-kubectl get pods -A -o wide 
+sleep 3
 
-kubectl get deployment ebs-csi-controller -n kube-system
-eksctl get addons --region $EKS_REGION --cluster $EKS_CLUSTER_NAME
+view_cluster
+
+echo "KUBECONFIG=$KUBECONFIG"
