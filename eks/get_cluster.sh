@@ -12,24 +12,21 @@ fi
 EKS_REGION="$1"
 EKS_CLUSTER_NAME="$2"
 
-echo "=== Checking EBS CSI Addon"
-eksctl get addon \
-  --name "aws-ebs-csi-driver" \
-  --region $EKS_REGION \
-  --cluster $EKS_CLUSTER_NAME
-echo 
-
+echo "=== Dumping IAM Service Accounts"
 eksctl get iamserviceaccount --region $EKS_REGION --cluster $EKS_CLUSTER_NAME 
 
-
 kubectl get sa ebs-csi-controller-sa -n kube-system -o yaml 
+kubectl get sa aws-load-balancer-controller -n kube-system -o yaml 
 
-echo "=== Nodes and Pods"
+echo 
+echo "=== Showing nodes, pods, and deployments"
 
 kubectl get nodes
 kubectl get pods -A -o wide 
-kubectl get deployment ebs-csi-controller -n kube-system
+
+echo
+kubectl get deployment -n kube-system
 echo 
 
 echo "=== Displaying addons"
-eksctl get addons --region $EKS_REGION --cluster $EKS_CLUSTER_NAME
+eksctl get addons --region $EKS_REGION --cluster $EKS_CLUSTER_NAME -o yaml
