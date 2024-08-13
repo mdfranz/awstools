@@ -135,7 +135,7 @@ eksctl create cluster -f $tempfile
 #  --approve --dumpLogs
 # eksctl create iamserviceaccount --cluster=<clusterName> --name=<serviceAccountName> --namespace=<serviceAccountNamespace> --attach-policy-arn=<policyARN>
 
-CSI_ACCOUNT_ROLE_ARN=$(eksctl get addon --cluster  $EKS_CLUSTER_NAME --region $EKS_REGION -1 -o json | jq -r '.[]|select(.Name=="aws-ebs-csi-driver")|.IAMRole')
+CSI_ACCOUNT_ROLE_ARN=$(eksctl get iamserviceaccount --region $EKS_REGION --cluster $EKS_CLUSTER_NAME  --output json | jq -r '.[]|select(.metadata.name=="ebs-csi-controller-sa")|.status.roleARN')
 
 echo "=== Creating EBS CSI Driver Addon"
 eksctl create addon \
