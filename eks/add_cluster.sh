@@ -102,15 +102,18 @@ iam:
       namespace: cert-manager
     wellKnownPolicies:
       certManager: true
-nodeGroups:
+managedNodeGroups:
   - name: ng-1
     instanceType: ${INSTANCE_TYPE}
-    desiredCapacity: 2
-    minSize: 2
-    maxSize: 5
+    desiredCapacity: 3
+    minSize: 3
+    maxSize: 7 
     volumeSize: 100
     volumeType: gp3
     volumeEncrypted: true
+    labels: {role: worker}
+    tags:
+      nodegroup-role: worker
 EOF
 
 eksctl create cluster -f $tempfile
