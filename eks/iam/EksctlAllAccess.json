@@ -18,19 +18,23 @@
             "Effect": "Allow"
         },
         {
-             "Action": [
-               "kms:CreateGrant",
-               "kms:DescribeKey"
-             ],
-             "Resource": "*",
-             "Effect": "Allow"
+            "Action": [
+                "kms:CreateGrant",
+                "kms:DescribeKey",
+                "kms:Encrypt",
+                "kms:Decrypt",
+                "kms:ReEncrypt*",
+                "kms:GenerateDataKey*"
+            ],
+            "Resource": "*",
+            "Effect": "Allow"
         },
         {
-             "Action": [
-               "logs:PutRetentionPolicy"
-             ],
-             "Resource": "*",
-             "Effect": "Allow"
-        }        
+            "Action": [
+                "logs:PutRetentionPolicy"
+            ],
+            "Resource": "*",
+            "Effect": "Allow"
+        }
     ]
 }
