@@ -83,25 +83,15 @@ iam:
   withOIDC: true
   serviceAccounts:
   - metadata:
-      name: aws-load-balancer-controller
-      namespace: kube-system
-    wellKnownPolicies:
-      awsLoadBalancerController: true
-  - metadata:
       name: ebs-csi-controller-sa
       namespace: kube-system
     wellKnownPolicies:
       ebsCSIController: true
   - metadata:
-      name: external-dns
+      name: efs-csi-controller-sa
       namespace: kube-system
     wellKnownPolicies:
-      externalDNS: true
-  - metadata:
-      name: cert-manager
-      namespace: cert-manager
-    wellKnownPolicies:
-      certManager: true
+      efsCSIController: true
 managedNodeGroups:
   - name: ng-1
     instanceType: ${INSTANCE_TYPE}
@@ -117,6 +107,11 @@ managedNodeGroups:
 EOF
 
 eksctl create cluster -f $tempfile
+
+echo "=== Displaying addons"
+eksctl get addons --region $EKS_REGION --cluster $EKS_CLUSTER_NAME
+
+sleep 3
 
 #
 # TODO - should check for existing Association 
