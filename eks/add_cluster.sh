@@ -92,6 +92,16 @@ iam:
       namespace: kube-system
     wellKnownPolicies:
       efsCSIController: true
+  - metadata:
+      name: external-dns
+      namespace: kube-system
+    wellKnownPolicies:
+      externalDNS: true
+  - metadata:
+      name: cert-manager
+      namespace: cert-manager
+    wellKnownPolicies:
+      certManager: true
 managedNodeGroups:
   - name: ng-1
     instanceType: ${INSTANCE_TYPE}
@@ -113,26 +123,6 @@ eksctl get addons --region $EKS_REGION --cluster $EKS_CLUSTER_NAME
 
 sleep 3
 
-#
-# TODO - should check for existing Association 
-#
-# eksctl utils associate-iam-oidc-provider \
-#  --cluster $EKS_CLUSTER_NAME \
-#  --region $EKS_REGION \
-#  --approve --dumpLogs
-#echo "=== Creating Service Account for EBS CSI Driver"
-#POLICY_ARN="arn:aws:iam::aws:policy/service-role/AmazonEBSCSIDriverPolicy"
-#eksctl create iamserviceaccount \
-#  --name "ebs-csi-controller-sa" \
-#  --namespace "kube-system" \
-#  --cluster $EKS_CLUSTER_NAME \
-#  --region $EKS_REGION \
-#  --attach-policy-arn $POLICY_ARN \
-#  --role-only \
-#  --role-name $CSI_ROLE_NAME \
-#  --approve --dumpLogs
-# eksctl create iamserviceaccount --cluster=<clusterName> --name=<serviceAccountName> --namespace=<serviceAccountNamespace> --attach-policy-arn=<policyARN>
-
 CSI_ACCOUNT_ROLE_ARN=$(eksctl get iamserviceaccount --region $EKS_REGION --cluster $EKS_CLUSTER_NAME  --output json | jq -r '.[]|select(.metadata.name=="ebs-csi-controller-sa")|.status.roleARN')
 
 echo "=== Creating EBS CSI Driver Addon"
@@ -152,24 +142,6 @@ then
 else
     echo "Skipping Metrics Server deployment"
 fi
-
-#eksctl create iamserviceaccount \
-#      --namespace "kube-system" \
-#      --cluster $EKS_CLUSTER_NAME \
-#      --region $EKS_REGION \
-#      --name "aws-load-balancer-controller" \
-#      --attach-policy-arn=arn:aws:iam::$ACCOUNT_ID:policy/LoadBalancerControllerPolicy \
-#      --override-existing-serviceaccounts \
-#      --approve --dumpLogs
-
-exit 
-
-helm repo add eks https://aws.github.io/eks-charts
-helm install aws-load-balancer-controller eks/aws-load-balancer-controller \
-     -n kube-system --set clusterName=$EKS_CLUSTER_NAME \
-     --set serviceAccount.create=false --set serviceAccount.name=aws-load-balancer-controller
-
-kubectl apply --validate=false -f $CERTMGR_CRD
 
 echo "=== Restarting Controllers"
 echo "Restarting EBS CSI Controller"
