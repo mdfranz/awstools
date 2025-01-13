@@ -7,6 +7,7 @@
 METRICS_CRD="https://github.com/kubernetes-sigs/metrics-server/releases/latest/download/components.yaml"
 CERTMGR_CRD="https://github.com/jetstack/cert-manager/releases/download/v1.12.3/cert-manager.yaml"
 LBC_CRD="https://github.com/kubernetes-sigs/aws-load-balancer-controller/releases/download/v2.8.2/v2_8_2_full.yaml"
+EKS_VERSION="1.31"
 
 #
 #
@@ -23,7 +24,6 @@ fi
 
 EKS_REGION="$1"
 EKS_CLUSTER_NAME="$2"
-EKS_VERSION="1.29"
 INSTANCE_TYPE="$3"
 
 ACCOUNT_ID=$(aws sts get-caller-identity  --query "Account" --output text)
@@ -40,11 +40,11 @@ view_cluster() {
     --cluster $EKS_CLUSTER_NAME
 
   echo "=== Checking Service Account"
-  kubectl get sa ebs-csi-controller-sa -n kube-system -o yaml 
+  kubectl get sa ebs-csi-controller-sa -n kube-system -o yaml
   eksctl get iamserviceaccount --region $EKS_REGION --cluster $EKS_CLUSTER_NAME -
 
   kubectl get nodes
-  kubectl get pods -A -o wide 
+  kubectl get pods -A -o wide
   kubectl get deployment ebs-csi-controller -n kube-system
 
   echo "=== Displaying addons"
@@ -55,7 +55,7 @@ read -p "Enable strict mode? (y/N) " exiterror
 if [[ $exiterror =~ ^[Yy]$ ]]
 then
   set -euo pipefail
-fi 
+fi
 
 echo "Creating cluster $EKS_CLUSTER_NAME in $ACCOUNT_ID in $EKS_REGION"
 
@@ -63,7 +63,7 @@ echo "Creating cluster $EKS_CLUSTER_NAME in $ACCOUNT_ID in $EKS_REGION"
 #  --region $EKS_REGION  --name $EKS_CLUSTER_NAME \
 #  --version $EKS_VERSION \
 #  --node-type $INSTANCE_TYPE  --nodes-min=2 --nodes-max=5 --dumpLogs
- 
+
 tempfile=$(mktemp)
 
 echo "=== Generating YAML eksctl configuration"
@@ -106,17 +106,23 @@ managedNodeGroups:
   - name: ng-1
     instanceType: ${INSTANCE_TYPE}
     desiredCapacity: 3
-    minSize: 3
-    maxSize: 7 
+    minSize: 2
+    maxSize: 7
     volumeSize: 100
     volumeType: gp3
     volumeEncrypted: true
     labels: {role: worker}
     tags:
       nodegroup-role: worker
+cloudWatch:
+  clusterLogging:
+    enableTypes: ["audit", "authenticator"]
+    logRetentionInDays: 14
 EOF
 
 eksctl create cluster -f $tempfile
+
+sleep 3
 
 echo "=== Displaying addons"
 eksctl get addons --region $EKS_REGION --cluster $EKS_CLUSTER_NAME
@@ -124,7 +130,7 @@ eksctl get addons --region $EKS_REGION --cluster $EKS_CLUSTER_NAME
 sleep 3
 
 CSI_ACCOUNT_ROLE_ARN=$(eksctl get iamserviceaccount --region $EKS_REGION --cluster $EKS_CLUSTER_NAME  --output json | jq -r '.[]|select(.metadata.name=="ebs-csi-controller-sa")|.status.roleARN')
-
+EFS_ACCOUNT_ROLE_ARN=$(eksctl get iamserviceaccount --region $EKS_REGION --cluster $EKS_CLUSTER_NAME  --output json | jq -r '.[]|select(.metadata.name=="efs-csi-controller-sa")|.status.roleARN')
 echo "=== Creating EBS CSI Driver Addon"
 eksctl create addon \
   --name "aws-ebs-csi-driver" \
@@ -132,6 +138,20 @@ eksctl create addon \
   --region=$EKS_REGION \
   --service-account-role-arn $CSI_ACCOUNT_ROLE_ARN \
   --force --dumpLogs
+
+  read -p "Do you want to add EBS EFS Driver Addon (y/N) " addEFS
+  if [[ $addEFS =~ ^[Yy]$ ]]
+  then
+      eksctl create addon \
+        --name "aws-efs-csi-driver" \
+        --cluster $EKS_CLUSTER_NAME \
+        --region=$EKS_REGION \
+        --service-account-role-arn $EFS_ACCOUNT_ROLE_ARN \
+        --force --dumpLogs
+  else
+      echo "Skipping Metrics Server deployment"
+  fi
+
 
 read -p "Do you want to add a metrics server? (y/N) " addMetrics
 if [[ $addMetrics =~ ^[Yy]$ ]]
@@ -143,8 +163,9 @@ else
     echo "Skipping Metrics Server deployment"
 fi
 
+
 echo "=== Restarting Controllers"
-echo "Restarting EBS CSI Controller"
+echo "Restarting EBS CSI Controller to ensure IRSA works"
 kubectl rollout restart deployment ebs-csi-controller -n kube-system
 
 # echo "Restarting AWS LB Controller"
