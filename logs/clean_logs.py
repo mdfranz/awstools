@@ -7,7 +7,7 @@ import boto3,sys,string,time,socket
 
 if __name__ == "__main__":
     if len(sys.argv) == 1:
-        print "./clean_logs.py <region>"
+        print ("./clean_logs.py <region>")
     else:
         region = sys.argv[1]
         c = boto3.client("logs",region_name = region)
@@ -16,23 +16,23 @@ if __name__ == "__main__":
             log_group = g['logGroupName']
             stream_count = len ( c.describe_log_streams(logGroupName=log_group)['logStreams'] )
 
-            print "FOUND GROUP",log_group, g['storedBytes'], stream_count
+            print ("FOUND GROUP",log_group, g['storedBytes'], stream_count)
 
             if int(g['storedBytes']) == 0 or stream_count == 0:
-                print "EMPTY LOG GROUP, DELETING:",log_group
+                print ("EMPTY LOG GROUP, DELETING:",log_group)
                 if not dry_run:
                     c.delete_log_group(logGroupName=log_group)
                 continue 
 
             for s in c.describe_log_streams(logGroupName=log_group)['logStreams']:
                 log_stream = s['logStreamName']
-                if s.has_key('lastIngestionTime'):
+                if 'lastIngestionTime' in s:
                     age_sec = int(time.time()) -  ( s['lastIngestionTime'] / 1000 ) 
 
-                    print "FOUND STREAM", log_stream, s['lastIngestionTime']
+                    print("FOUND STREAM", log_stream, s['lastIngestionTime'])
 
                     if ( age_sec / ( 3600 * 24 ) )  > 180: 
-                        print s 
-                        print "STALE LOG STREAM, DELETING:",log_stream
+                        print (s)
+                        print ("STALE LOG STREAM, DELETING:",log_stream)
                         if not dry_run:
                             c.delete_log_stream(logGroupName=log_group,logStreamName=log_stream)
