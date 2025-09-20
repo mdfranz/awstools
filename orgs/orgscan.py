@@ -2,6 +2,7 @@
 
 import boto3,json
 from botocore.exceptions import ClientError
+from datetime import datetime
 
 def get_all_policies(org_client) -> dict:
     policy_map = {}
@@ -80,6 +81,150 @@ def get_organization_structure(org_client) -> tuple[dict, dict, dict]:
 
     return ou_map, account_map, policy_attachments
 
+def generate_markdown_report(ou_map, account_map, policy_attachments, policy_map, output_file="aws_organization_report.md"):
+    try:
+        with open(output_file, 'w') as f:
+            # Header and metadata
+            f.write("# AWS Organization Structure Report\n\n")
+            f.write(f"Generated on: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n\n")
+
+            # Summary section
+            f.write("## Summary\n\n")
+            f.write(f"- **Total Organizational Units (including Root):** {len(ou_map)}\n")
+            f.write(f"- **Total Accounts:** {len(account_map)}\n")
+            f.write(f"- **Total Service Control Policies:** {len(policy_map)}\n")
+            f.write(f"- **Entities with SCPs Attached:** {len(policy_attachments)}\n\n")
+
+            # Organization Units section
+            f.write("## Organizational Units\n\n")
+            f.write("| OU ID | Name | Parent ID | ARN |\n")
+            f.write("|-------|------|-----------|-----|\n")
+
+            for ou_id, ou_details in ou_map.items():
+                parent_name = "N/A" if ou_details['ParentId'] is None else ou_map.get(ou_details['ParentId'], {}).get('Name', ou_details['ParentId'])
+                f.write(f"| `{ou_id}` | {ou_details['Name']} | {parent_name} | `{ou_details['Arn']}` |\n")
+
+            f.write("\n")
+
+            # Accounts section
+            f.write("## Accounts\n\n")
+            f.write("| Account ID | Name | Email | Parent OU | ARN |\n")
+            f.write("|------------|------|-------|-----------|-----|\n")
+
+            for account_id, account_details in account_map.items():
+                parent_name = ou_map.get(account_details['ParentId'], {}).get('Name', account_details['ParentId'])
+                f.write(f"| `{account_id}` | {account_details['Name']} | {account_details['Email']} | {parent_name} | `{account_details['Arn']}` |\n")
+
+            f.write("\n")
+
+            # Policy Attachments section
+            f.write("## Policy Attachments\n\n")
+            if policy_attachments:
+                f.write("### Entities with Service Control Policies\n\n")
+                for target_id, policy_ids in policy_attachments.items():
+                    # Determine if target is an OU or Account
+                    if target_id in ou_map:
+                        target_type = "OU"
+                        target_name = ou_map[target_id]['Name']
+                    elif target_id in account_map:
+                        target_type = "Account"
+                        target_name = account_map[target_id]['Name']
+                    else:
+                        target_type = "Unknown"
+                        target_name = "Unknown"
+
+                    f.write(f"#### {target_type}: {target_name} (`{target_id}`)\n\n")
+                    f.write("**Attached Policies:**\n")
+                    for policy_id in policy_ids:
+                        policy_name = policy_map.get(policy_id, {}).get('Name', 'Unknown Policy')
+                        f.write(f"- `{policy_id}` - {policy_name}\n")
+                    f.write("\n")
+            else:
+                f.write("No Service Control Policies are currently attached to any entities.\n\n")
+
+            # Service Control Policies section
+            f.write("## Service Control Policies\n\n")
+            if policy_map:
+                for policy_id, policy_details in policy_map.items():
+                    f.write(f"### {policy_details['Name']} (`{policy_id}`)\n\n")
+                    f.write(f"**Description:** {policy_details.get('Description', 'No description available')}\n\n")
+
+                    # Show where this policy is attached
+                    attached_to = []
+                    for target_id, policy_ids in policy_attachments.items():
+                        if policy_id in policy_ids:
+                            if target_id in ou_map:
+                                attached_to.append(f"OU: {ou_map[target_id]['Name']} (`{target_id}`)")
+                            elif target_id in account_map:
+                                attached_to.append(f"Account: {account_map[target_id]['Name']} (`{target_id}`)")
+
+                    if attached_to:
+                        f.write("**Attached to:**\n")
+                        for attachment in attached_to:
+                            f.write(f"- {attachment}\n")
+                        f.write("\n")
+                    else:
+                        f.write("**Attached to:** Not currently attached to any entities\n\n")
+
+                    # Policy content
+                    f.write("**Policy Document:**\n")
+                    f.write("```json\n")
+                    try:
+                        policy_content = json.loads(policy_details['Content'])
+                        f.write(json.dumps(policy_content, indent=2))
+                    except json.JSONDecodeError:
+                        f.write(policy_details['Content'])
+                    f.write("\n```\n\n")
+            else:
+                f.write("No Service Control Policies found.\n\n")
+
+            # Organization Hierarchy section
+            f.write("## Organization Hierarchy\n\n")
+            f.write("This section shows the hierarchical structure of your AWS Organization.\n\n")
+
+            def write_hierarchy(parent_id, indent=0):
+                indent_str = "  " * indent
+
+                # Write OUs under this parent
+                for ou_id, ou_details in ou_map.items():
+                    if ou_details['ParentId'] == parent_id:
+                        policies_text = ""
+                        if ou_id in policy_attachments:
+                            policy_names = [policy_map.get(pid, {}).get('Name', pid) for pid in policy_attachments[ou_id]]
+                            policies_text = f" 🔒 SCPs: {', '.join(policy_names)}"
+
+                        f.write(f"{indent_str}- **{ou_details['Name']}** (`{ou_id}`){policies_text}\n")
+                        write_hierarchy(ou_id, indent + 1)
+
+                # Write Accounts under this parent
+                for account_id, account_details in account_map.items():
+                    if account_details['ParentId'] == parent_id:
+                        policies_text = ""
+                        if account_id in policy_attachments:
+                            policy_names = [policy_map.get(pid, {}).get('Name', pid) for pid in policy_attachments[account_id]]
+                            policies_text = f" 🔒 SCPs: {', '.join(policy_names)}"
+
+                        f.write(f"{indent_str}  - 🏢 **{account_details['Name']}** (`{account_id}`) - {account_details['Email']}{policies_text}\n")
+
+            # Start from root
+            root_id = None
+            for ou_id, ou_details in ou_map.items():
+                if ou_details['ParentId'] is None:
+                    root_id = ou_id
+                    break
+
+            if root_id:
+                write_hierarchy(root_id)
+
+            f.write("\n---\n")
+            f.write("*Report generated by AWS Organizations Scanner*\n")
+
+        print(f"✅ Markdown report generated: {output_file}")
+        return output_file
+
+    except Exception as e:
+        print(f"Error generating Markdown report: {e}")
+        return None
 
 if __name__ == "__main__":
     try:
@@ -120,6 +265,9 @@ if __name__ == "__main__":
 
         print("\n--- Detailed Policy Attachments ---")
         print(json.dumps(policy_attachments, indent=2))
+
+        print("\n--- Creating Markdown Document ---")
+        generate_markdown_report(ou_map, account_map, policy_attachments, policy_map)
 
 
     except Exception as e:
